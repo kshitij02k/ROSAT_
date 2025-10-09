@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ROSAT - Complete Your Profile</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+</head>
+
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+  <div class="bg-white rounded-lg shadow-lg max-w-md w-full p-8">
+    <h1 class="text-2xl font-semibold mb-6 text-center text-gray-800">Complete Your Profile</h1>
+
+    <form id="profileForm" class="space-y-6">
+      <div>
+        <label for="fullName" class="block text-gray-700 font-medium mb-2">Full Name</label>
+        <input type="text" id="fullName" name="fullName"
+          class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="Enter your full name" required />
+        <p id="fullNameError" class="text-red-500 text-sm mt-1 hidden">Full Name is required.</p>
+      </div>
+
+      <div>
+        <label for="year" class="block text-gray-700 font-medium mb-2">Year of Study</label>
+        <select id="year" name="year"
+          class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          required>
+          <option value="">Select Year</option>
+          <option value="1st">1st</option>
+          <option value="2nd">2nd</option>
+          <option value="3rd">3rd</option>
+          <option value="4th">4th</option>
+        </select>
+        <p id="yearError" class="text-red-500 text-sm mt-1 hidden">Please select your Year of Study.</p>
+      </div>
+
+      <div>
+        <label for="semester" class="block text-gray-700 font-medium mb-2">Semester</label>
+        <select id="semester" name="semester"
+          class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          required>
+          <option value="">Select Semester</option>
+          <option value="Sem 1">Sem 1</option>
+          <option value="Sem 2">Sem 2</option>
+          <option value="Sem 3">Sem 3</option>
+          <option value="Sem 4">Sem 4</option>
+          <option value="Sem 5">Sem 5</option>
+          <option value="Sem 6">Sem 6</option>
+          <option value="Sem 7">Sem 7</option>
+          <option value="Sem 8">Sem 8</option>
+        </select>
+        <p id="semesterError" class="text-red-500 text-sm mt-1 hidden">Please select your Semester.</p>
+      </div>
+
+      <div>
+        <label for="branch" class="block text-gray-700 font-medium mb-2">Branch</label>
+        <select id="branch" name="branch"
+          class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          required>
+          <option value="">Select Branch</option>
+          <option value="Computer Engineering">Computer Engineering</option>
+          <option value="Other">Other</option>
+        </select>
+        <p id="branchError" class="text-red-500 text-sm mt-1 hidden">Please select your Branch.</p>
+      </div>
+
+      <button type="submit"
+        class="w-full bg-indigo-600 text-white py-3 rounded-md font-semibold hover:bg-indigo-700 transition">
+        Submit
+      </button>
+    </form>
+  </div>
+
+  <script>
+    // TODO: Replace with your Firebase config
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      projectId: "YOUR_PROJECT_ID",
+      // ...other config
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    const profileForm = document.getElementById("profileForm");
+
+    // Show or hide error messages
+    function showError(id, show) {
+      const el = document.getElementById(id);
+      if (show) {
+        el.classList.remove("hidden");
+      } else {
+        el.classList.add("hidden");
+      }
+    }
+
+    // Validate form fields
+    function validateForm(data) {
+      let valid = true;
+
+      if (!data.fullName.trim()) {
+        showError("fullNameError", true);
+        valid = false;
+      } else {
+        showError("fullNameError", false);
+      }
+
+      if (!data.year) {
+        showError("yearError", true);
+        valid = false;
+      } else {
+        showError("yearError", false);
+      }
+
+      if (!data.semester) {
+        showError("semesterError", true);
+        valid = false;
+      } else {
+        showError("semesterError", false);
+      }
+
+      if (!data.branch) {
+        showError("branchError", true);
+        valid = false;
+      } else {
+        showError("branchError", false);
+      }
+
+      return valid;
+    }
+
+    // On page load
+    auth.onAuthStateChanged(async (user) => {
+      if (!user) {
+        // Not logged in, redirect to login page
+        window.location.href = "AuthForm.tsx";
+        return;
+      }
+
+      try {
+        const docRef = db.collection("users").doc(user.uid);
+        const docSnap = await docRef.get();
+
+        if (docSnap.exists) {
+          // Profile exists, redirect to dashboard
+          window.location.href = "dashboard.html";
+        } else {
+          // Show form (already visible)
+        }
+      } catch (error) {
+        console.error("Error checking profile:", error);
+        alert("An error occurred. Please try again.");
+      }
+    });
+
+    profileForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const data = {
+        fullName: profileForm.fullName.value.trim(),
+        year: profileForm.year.value,
+        semester: profileForm.semester.value,
+        branch: profileForm.branch.value,
+      };
+
+      if (!validateForm(data)) {
+        return;
+      }
+
+      const user = auth.currentUser;
+      if (!user) {
+        alert("User  not logged in.");
+        window.location.href = "AuthForm.tsx";
+        return;
+      }
+
+      try {
+        await db.collection("users").doc(user.uid).set(data);
+        window.location.href = "dashboard.html";
+      } catch (error) {
+        console.error("Error saving profile:", error);
+        alert("Failed to save profile. Please try again.");
+      }
+    });
+  </script>
+</body>
+
+</html>
