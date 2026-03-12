@@ -10,6 +10,7 @@ const JoinQueue = () => {
     emergencyLevel: '1',
     preferredDoctor: ''
   });
+  const [doctorChoice, setDoctorChoice] = useState('auto'); // 'auto' | 'choose'
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -117,7 +118,7 @@ const JoinQueue = () => {
               </button>
               <button
                 className="btn btn-secondary"
-                onClick={() => { setResult(null); setForm({ name: '', age: '', symptoms: '', emergencyLevel: '1', preferredDoctor: '' }); }}
+                onClick={() => { setResult(null); setDoctorChoice('auto'); setForm({ name: '', age: '', symptoms: '', emergencyLevel: '1', preferredDoctor: '' }); }}
               >
                 Join Another Queue
               </button>
@@ -208,23 +209,110 @@ const JoinQueue = () => {
 
             <div className="form-group">
               <label className="form-label">Preferred Doctor (Optional)</label>
-              <select
-                name="preferredDoctor"
-                className="form-control"
-                value={form.preferredDoctor}
-                onChange={handleChange}
+
+              {/* Option 1 – Auto-assign */}
+              <div
+                onClick={() => { setDoctorChoice('auto'); setForm(f => ({ ...f, preferredDoctor: '' })); }}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px',
+                  border: `2px solid ${doctorChoice === 'auto' ? 'var(--primary)' : 'var(--gray-200)'}`,
+                  borderRadius: 8, cursor: 'pointer', marginBottom: 8,
+                  background: doctorChoice === 'auto' ? 'var(--primary-light, #eff6ff)' : 'var(--gray-50)'
+                }}
               >
-                <option value="">— Auto-assign best available doctor —</option>
-                {doctors.map((doc) => (
-                  <option key={doc._id} value={doc._id}>
-                    Dr. {doc.name} — {doc.specialization}
-                    {doc.queueLength > 0 ? ` (${doc.queueLength} in queue)` : ' (Available)'}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-muted" style={{ marginTop: 4 }}>
-                If your preferred doctor is unavailable, you'll be assigned to the best available doctor
-              </p>
+                <input
+                  type="radio"
+                  name="doctorChoice"
+                  value="auto"
+                  checked={doctorChoice === 'auto'}
+                  onChange={() => { setDoctorChoice('auto'); setForm(f => ({ ...f, preferredDoctor: '' })); }}
+                  style={{ marginTop: 3 }}
+                />
+                <div>
+                  <p style={{ margin: 0, fontWeight: 600 }}>🤖 Auto-assign (Recommended)</p>
+                  <p className="text-xs text-muted" style={{ margin: '2px 0 0' }}>
+                    The system will assign the best available doctor based on your symptoms and emergency level.
+                  </p>
+                </div>
+              </div>
+
+              {/* Option 2 – Choose a specific doctor */}
+              <div
+                onClick={() => setDoctorChoice('choose')}
+                style={{
+                  border: `2px solid ${doctorChoice === 'choose' ? 'var(--primary)' : 'var(--gray-200)'}`,
+                  borderRadius: 8, cursor: 'pointer',
+                  background: doctorChoice === 'choose' ? 'var(--primary-light, #eff6ff)' : 'var(--gray-50)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px' }}>
+                  <input
+                    type="radio"
+                    name="doctorChoice"
+                    value="choose"
+                    checked={doctorChoice === 'choose'}
+                    onChange={() => setDoctorChoice('choose')}
+                    style={{ marginTop: 3 }}
+                  />
+                  <div>
+                    <p style={{ margin: 0, fontWeight: 600 }}>👨‍⚕️ Choose a specific doctor</p>
+                    <p className="text-xs text-muted" style={{ margin: '2px 0 0' }}>
+                      Select from the list of currently available doctors.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Doctor list — shown only when 'choose' is selected */}
+                {doctorChoice === 'choose' && (
+                  <div style={{ padding: '0 16px 16px' }}>
+                    {doctors.length === 0 ? (
+                      <p className="text-sm text-muted" style={{ margin: 0 }}>
+                        No doctors are currently available. Use Auto-assign or try again later.
+                      </p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {doctors.map((doc) => (
+                          <div
+                            key={doc._id}
+                            onClick={(e) => { e.stopPropagation(); setForm(f => ({ ...f, preferredDoctor: doc._id })); }}
+                            style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                              padding: '10px 14px', borderRadius: 6, cursor: 'pointer',
+                              border: `2px solid ${form.preferredDoctor === doc._id ? 'var(--success)' : 'var(--gray-200)'}`,
+                              background: form.preferredDoctor === doc._id ? '#f0fdf4' : '#fff'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <input
+                                type="radio"
+                                name="selectedDoctor"
+                                checked={form.preferredDoctor === doc._id}
+                                onChange={() => setForm(f => ({ ...f, preferredDoctor: doc._id }))}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <div>
+                                <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>Dr. {doc.name}</p>
+                                <p className="text-xs text-muted" style={{ margin: 0 }}>{doc.specialization}</p>
+                              </div>
+                            </div>
+                            <span
+                              className={`badge ${doc.queueLength === 0 ? 'badge-success' : 'badge-warning'}`}
+                              style={{ fontSize: 11 }}
+                            >
+                              {doc.queueLength === 0 ? '✅ Available' : `${doc.queueLength} in queue`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {doctorChoice === 'choose' && !form.preferredDoctor && (
+                      <p className="text-xs text-muted" style={{ marginTop: 8, marginBottom: 0 }}>
+                        Please select a doctor above, or switch to Auto-assign.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             <button
