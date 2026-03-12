@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { patientAPI } from '../../services/api';
 
@@ -10,10 +10,23 @@ const JoinQueue = () => {
     emergencyLevel: '1',
     preferredDoctor: ''
   });
+  const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        const res = await patientAPI.getAvailableDoctors();
+        setDoctors(res.data);
+      } catch {
+        // non-critical: just leave dropdown empty
+      }
+    };
+    fetchDoctors();
+  }, []);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -195,14 +208,20 @@ const JoinQueue = () => {
 
             <div className="form-group">
               <label className="form-label">Preferred Doctor (Optional)</label>
-              <input
-                type="text"
+              <select
                 name="preferredDoctor"
                 className="form-control"
-                placeholder="Doctor ID or leave blank for auto-assignment"
                 value={form.preferredDoctor}
                 onChange={handleChange}
-              />
+              >
+                <option value="">— Auto-assign best available doctor —</option>
+                {doctors.map((doc) => (
+                  <option key={doc._id} value={doc._id}>
+                    Dr. {doc.name} — {doc.specialization}
+                    {doc.queueLength > 0 ? ` (${doc.queueLength} in queue)` : ' (Available)'}
+                  </option>
+                ))}
+              </select>
               <p className="text-xs text-muted" style={{ marginTop: 4 }}>
                 If your preferred doctor is unavailable, you'll be assigned to the best available doctor
               </p>

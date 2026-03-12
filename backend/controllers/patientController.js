@@ -159,4 +159,13 @@ const leaveQueue = async (req, res) => {
   }
 };
 
-module.exports = { joinQueue, getQueueStatus, getHistory, leaveQueue };
+const getAvailableDoctors = async (req, res) => {
+  try {
+    const doctors = await Doctor.find({ availability: true }, 'name specialization experience queueLength');
+    res.json(doctors);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching available doctors' });
+  }
+};
+
+module.exports = { joinQueue, getQueueStatus, getHistory, leaveQueue, getAvailableDoctors };

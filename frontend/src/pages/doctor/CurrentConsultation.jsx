@@ -55,7 +55,9 @@ const CurrentConsultation = () => {
 
   const handleStart = async (patient) => {
     try {
-      const res = await doctorAPI.startConsultation({ patientId: patient._id || patient.patientId?._id });
+      // If this is a queue entry, patient.patientId holds the populated Patient doc
+      const patientId = patient.patientId?._id || patient._id;
+      const res = await doctorAPI.startConsultation({ patientId });
       setConsultation(res.data.consultation);
       setCurrentPatient(patient.patientId || patient);
       startTimer();

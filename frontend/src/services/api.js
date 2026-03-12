@@ -42,7 +42,8 @@ export const patientAPI = {
   joinQueue: (data) => api.post('/patient/join-queue', data),
   getQueueStatus: () => api.get('/patient/queue-status'),
   getHistory: () => api.get('/patient/history'),
-  leaveQueue: () => api.post('/patient/leave-queue')
+  leaveQueue: () => api.post('/patient/leave-queue'),
+  getAvailableDoctors: () => api.get('/patient/available-doctors')
 };
 
 // Doctor API
