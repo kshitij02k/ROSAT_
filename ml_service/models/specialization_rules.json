@@ -1,0 +1,56 @@
+{
+  "Cardiologist": [
+    "chest pain",
+    "heart",
+    "palpitation",
+    "cardiac"
+  ],
+  "Neurologist": [
+    "headache",
+    "brain",
+    "seizure",
+    "neurological",
+    "migraine",
+    "dizziness"
+  ],
+  "Dermatologist": [
+    "skin",
+    "rash",
+    "acne",
+    "eczema",
+    "dermatitis"
+  ],
+  "Orthopedist": [
+    "bone",
+    "joint",
+    "fracture",
+    "arthritis",
+    "orthopedic",
+    "back pain"
+  ],
+  "Gastroenterologist": [
+    "stomach",
+    "abdomen",
+    "digestive",
+    "gastric",
+    "nausea",
+    "vomiting",
+    "diarrhea"
+  ],
+  "Pulmonologist": [
+    "lung",
+    "breathing",
+    "cough",
+    "asthma",
+    "respiratory",
+    "pneumonia"
+  ],
+  "Psychiatrist": [
+    "mental",
+    "anxiety",
+    "depression",
+    "psychiatric",
+    "stress",
+    "mood"
+  ]
+}
