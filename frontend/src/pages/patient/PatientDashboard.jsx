@@ -52,11 +52,23 @@ export function PatientDashboard() {
         patientApi.getMyAppointments(),
         patientApi.getHistory()
       ]);
-      if (qRes.status === 'fulfilled') setQueueEntry(qRes.value.data);
+      if (qRes.status === 'fulfilled') {
+        const data = qRes.value.data;
+        // Backend returns { consultation, queuePosition } — flatten for the UI
+        if (data.consultation) {
+          setQueueEntry({
+            ...data.consultation,
+            position: data.queuePosition,
+            queuePosition: data.queuePosition,
+          });
+        } else {
+          setQueueEntry(null);
+        }
+      }
       if (apptRes.status === 'fulfilled')
         setAppointments(apptRes.value.data.appointments || apptRes.value.data || []);
       if (histRes.status === 'fulfilled')
-        setHistory(histRes.value.data.history || histRes.value.data || []);
+        setHistory(histRes.value.data.consultations || histRes.value.data.history || histRes.value.data || []);
     } catch (err) {
       setError('Failed to load dashboard data.');
     } finally {
@@ -198,6 +210,8 @@ export function PatientDashboard() {
                   <div className="font-semibold text-sm text-gray-900">
                     {queueEntry.doctorName
                       ? `Dr. ${queueEntry.doctorName}`
+                      : queueEntry.doctorId?.name
+                      ? `Dr. ${queueEntry.doctorId.name}`
                       : queueEntry.doctor?.name
                       ? `Dr. ${queueEntry.doctor.name}`
                       : '—'}

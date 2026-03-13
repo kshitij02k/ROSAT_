@@ -16,7 +16,7 @@ const ConsultationSchema = new mongoose.Schema({
   },
   visitType: {
     type: String,
-    enum: ['Checkup', 'Follow-up'],
+    enum: ['Checkup', 'Follow-up', 'Urgent'],
     required: true,
   },
   previousVisits: {

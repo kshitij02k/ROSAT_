@@ -288,13 +288,15 @@ export function JoinQueue() {
           {doctors.length > 0 && (
             <div className="mb-4">
               <label className={labelClass}>Or choose a specific doctor</label>
-              {doctors.map((doc) => (
+              {doctors.map((doc) => {
+                const docKey = doc.userId || doc._id || doc.id;
+                return (
                 <div
-                  key={doc._id || doc.id}
+                  key={docKey}
                   className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer hover:border-primary transition mb-3 ${
-                    selectedDoctor === (doc._id || doc.id) ? 'border-primary bg-blue-50' : 'border-gray-200'
+                    selectedDoctor === docKey ? 'border-primary bg-blue-50' : 'border-gray-200'
                   }`}
-                  onClick={() => setSelectedDoctor(doc._id || doc.id)}
+                  onClick={() => setSelectedDoctor(docKey)}
                 >
                   <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
                     {doc.name?.charAt(0).toUpperCase() || 'D'}
@@ -304,13 +306,14 @@ export function JoinQueue() {
                     <div className="text-xs text-gray-500">{doc.specialization}</div>
                   </div>
                   <div className="text-xs text-gray-500">Queue: {doc.queueLength ?? 0}</div>
-                  {selectedDoctor === (doc._id || doc.id) && (
+                  {selectedDoctor === docKey && (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
                       Selected
                     </span>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -363,8 +366,8 @@ export function JoinQueue() {
             <div className="font-semibold text-sm text-gray-900">
               {selectedDoctor === 'auto'
                 ? '🤖 Auto-Assign'
-                : doctors.find((d) => (d._id || d.id) === selectedDoctor)?.name
-                  ? `Dr. ${doctors.find((d) => (d._id || d.id) === selectedDoctor)?.name}`
+                : doctors.find((d) => (d.userId || d._id || d.id) === selectedDoctor)?.name
+                  ? `Dr. ${doctors.find((d) => (d.userId || d._id || d.id) === selectedDoctor)?.name}`
                   : 'Selected'}
             </div>
           </div>

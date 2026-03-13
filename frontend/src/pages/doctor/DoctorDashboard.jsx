@@ -61,11 +61,13 @@ export function DoctorDashboard() {
       ]);
       if (qRes.status === 'fulfilled') {
         const data = qRes.value.data;
-        setIsOnline(data.isOnline ?? data.doctor?.isOnline ?? false);
-        setQueue(data.queue || data || []);
+        setIsOnline(data.isOnline ?? false);
+        setQueue(data.queue || []);
       }
       if (cpRes.status === 'fulfilled') {
-        setCurrentPatient(cpRes.value.data?.patient || cpRes.value.data || null);
+        // Backend returns { consultation }, extract the consultation object
+        const cpData = cpRes.value.data;
+        setCurrentPatient(cpData?.consultation || null);
       }
     } catch {
       setError('Failed to load queue data.');
@@ -251,7 +253,7 @@ export function DoctorDashboard() {
                 <div>
                   <div className="text-xs text-gray-500 mb-1">Patient Name</div>
                   <div className="font-bold text-lg text-gray-900">
-                    {currentPatient.name || currentPatient.patientName || '—'}
+                    {currentPatient.patientName || currentPatient.patientId?.name || currentPatient.name || '—'}
                   </div>
                 </div>
                 <div>
@@ -389,7 +391,7 @@ export function DoctorDashboard() {
                     >
                       <td className="px-4 py-3 border-t border-gray-100 font-bold">{idx + 1}</td>
                       <td className="px-4 py-3 border-t border-gray-100 font-semibold">
-                        {entry.name || entry.patientName || '—'}
+                        {entry.patientName || entry.patientId?.name || entry.name || '—'}
                       </td>
                       <td className="px-4 py-3 border-t border-gray-100">
                         <span className={emergencyBadgeClass(entry.emergencyLevel)}>
