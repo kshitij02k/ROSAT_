@@ -8,6 +8,7 @@ const {
   getHistory,
   bookAppointment,
   getMyAppointments,
+  urgentRequest,
 } = require('../controllers/patientController');
 
 const requirePatient = (req, res, next) => {
@@ -24,5 +25,6 @@ router.get('/my-queue', getMyQueue);
 router.get('/history', getHistory);
 router.post('/appointment', bookAppointment);
 router.get('/appointments', getMyAppointments);
+router.post('/urgent-request', urgentRequest);
 
 module.exports = router;

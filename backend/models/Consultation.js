@@ -29,12 +29,22 @@ const ConsultationSchema = new mongoose.Schema({
     max: 5,
     required: true,
   },
+  aiEmergencyLevel: {
+    type: Number,
+    min: 1,
+    max: 5,
+  },
   predictedCategory: {
     type: String,
   },
+  isCritical: {
+    type: Boolean,
+    default: false,
+  },
   consultationMode: {
     type: String,
-    enum: ['video', 'chat'],
+    enum: ['video', 'chat', 'pending'],
+    default: 'pending',
   },
   predictedDuration: {
     type: Number,

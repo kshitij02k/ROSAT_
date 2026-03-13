@@ -36,7 +36,8 @@ export const patient = {
   getMyQueue: () => api.get('/patient/my-queue'),
   getHistory: () => api.get('/patient/history'),
   bookAppointment: (data) => api.post('/patient/appointment', data),
-  getMyAppointments: () => api.get('/patient/appointments')
+  getMyAppointments: () => api.get('/patient/appointments'),
+  urgentRequest: (data) => api.post('/patient/urgent-request', data)
 };
 
 export const doctor = {

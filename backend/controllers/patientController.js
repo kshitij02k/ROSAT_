@@ -2,8 +2,9 @@ const Consultation = require('../models/Consultation');
 const Doctor = require('../models/Doctor');
 const Patient = require('../models/Patient');
 const User = require('../models/User');
-const { predictSpecialization, predictDuration } = require('../services/mlService');
-const { calculatePriorityScore, reorderQueue } = require('../services/queueService');
+const { predictDuration } = require('../services/mlService');
+const { calculatePriorityScore, reorderQueue, handleEmergencySpillover, checkDoctorInaction } = require('../services/queueService');
+const { triageSymptoms } = require('../services/groqService');
 const { getIo } = require('../server');
 
 const findBestDoctor = async (specialization, excludeId) => {
@@ -20,15 +21,14 @@ const joinQueue = async (req, res) => {
       symptoms,
       visitType,
       previousVisits,
-      emergencyLevel,
       consultationMode,
       doctorId,
       age,
       gender,
     } = req.body;
 
-    if (!symptoms || !visitType || !emergencyLevel) {
-      return res.status(400).json({ message: 'symptoms, visitType, and emergencyLevel are required' });
+    if (!symptoms || !visitType) {
+      return res.status(400).json({ message: 'symptoms and visitType are required' });
     }
 
     const patientUser = await User.findById(req.user.id);
@@ -37,8 +37,13 @@ const joinQueue = async (req, res) => {
     const resolvedAge = age || patientProfile?.age;
     const resolvedGender = gender || patientProfile?.gender;
 
-    // ML predictions
-    const predictedCategory = await predictSpecialization(symptoms);
+    // AI Triage: Groq determines emergency level, specialization, and critical status
+    const triage = await triageSymptoms(symptoms, resolvedAge, resolvedGender, visitType);
+    const emergencyLevel = triage.emergencyLevel;
+    const predictedCategory = triage.doctorSpecialization;
+    const isCritical = triage.isCriticalOperationToday;
+
+    // ML Prediction: Flask returns predicted consultation duration
     const predictedDuration = await predictDuration(
       resolvedAge,
       symptoms,
@@ -46,7 +51,7 @@ const joinQueue = async (req, res) => {
       previousVisits || 0
     );
 
-    // Find doctor
+    // Find doctor based on AI-determined specialization
     let assignedDoctor = null;
     if (doctorId) {
       assignedDoctor = await Doctor.findOne({ userId: doctorId, isOnline: true });
@@ -64,7 +69,13 @@ const joinQueue = async (req, res) => {
       return res.status(400).json({ message: 'No online doctors available at the moment' });
     }
 
-    const initialPriorityScore = calculatePriorityScore(emergencyLevel, 0);
+    const initialPriorityScore = calculatePriorityScore(emergencyLevel, 0, previousVisits || 0);
+
+    // Critical Operation Bypass: force to emergency level 5 in immediate queue
+    const finalEmergencyLevel = isCritical ? 5 : emergencyLevel;
+    const finalPriorityScore = isCritical
+      ? calculatePriorityScore(5, 0, previousVisits || 0) + 1000
+      : initialPriorityScore;
 
     const consultation = await Consultation.create({
       patientId: req.user.id,
@@ -72,11 +83,13 @@ const joinQueue = async (req, res) => {
       symptoms,
       visitType,
       previousVisits: previousVisits || 0,
-      emergencyLevel,
+      emergencyLevel: finalEmergencyLevel,
+      aiEmergencyLevel: emergencyLevel,
       predictedCategory,
-      consultationMode: consultationMode || 'video',
+      isCritical,
+      consultationMode: consultationMode || 'pending',
       predictedDuration,
-      priorityScore: initialPriorityScore,
+      priorityScore: finalPriorityScore,
       type: 'live',
       age: resolvedAge,
       gender: resolvedGender,
@@ -92,26 +105,49 @@ const joinQueue = async (req, res) => {
     if (io) {
       io.to(`doctor:${assignedDoctor.userId}`).emit('queue:updated', { queue: updatedQueue });
 
-      if (emergencyLevel >= 4) {
+      if (isCritical) {
+        // Critical Operation Bypass: emergency bell on doctor dashboard
+        io.to(`doctor:${assignedDoctor.userId}`).emit('queue:critical-bypass', {
+          message: `CRITICAL: Patient requires immediate emergency intervention!`,
+          consultation,
+        });
+        io.to('admin').emit('admin:critical-bypass', {
+          message: `Critical operation bypass triggered for patient ${patientUser.name}`,
+          consultation,
+        });
+      } else if (finalEmergencyLevel >= 4) {
         io.to(`doctor:${assignedDoctor.userId}`).emit('queue:emergency-warning', {
-          message: `Emergency patient (level ${emergencyLevel}) joined queue`,
+          message: `Emergency patient (level ${finalEmergencyLevel}) joined queue`,
           consultation,
         });
         io.to('admin').emit('admin:emergency-alert', {
-          message: `Emergency patient (level ${emergencyLevel}) joined queue`,
+          message: `Emergency patient (level ${finalEmergencyLevel}) joined queue`,
           patientId: req.user.id,
           doctorId: assignedDoctor.userId,
           consultation,
         });
       }
+
+      // Load Balancing: Check if multiple emergencies for same doctor
+      if (finalEmergencyLevel >= 4) {
+        const emergencyConsultations = await Consultation.find({
+          doctorId: assignedDoctor.userId,
+          status: 'waiting',
+          emergencyLevel: { $gte: 4 },
+          type: 'live',
+        });
+        if (emergencyConsultations.length > 1) {
+          await handleEmergencySpillover(assignedDoctor.userId, emergencyConsultations, io);
+        }
+      }
     }
 
-    const position = updatedQueue.findIndex(
+    const finalQueue = await reorderQueue(assignedDoctor.userId);
+    const position = finalQueue.findIndex(
       (c) => c._id.toString() === consultation._id.toString()
     );
-    // Sum the predicted durations of all consultations ahead in queue
-    const predictedWaitTime = updatedQueue
-      .slice(0, position)
+    const predictedWaitTime = finalQueue
+      .slice(0, Math.max(0, position))
       .reduce((sum, c) => sum + (c.predictedDuration || 15), 0);
 
     res.status(201).json({
@@ -122,6 +158,11 @@ const joinQueue = async (req, res) => {
         specialization: assignedDoctor.specialization,
       },
       predictedWaitTime: Math.round(predictedWaitTime),
+      triage: {
+        emergencyLevel: finalEmergencyLevel,
+        specialization: predictedCategory,
+        isCritical,
+      },
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -177,7 +218,6 @@ const bookAppointment = async (req, res) => {
       symptoms,
       visitType,
       previousVisits,
-      emergencyLevel,
       consultationMode,
       doctorId,
       scheduledDate,
@@ -186,9 +226,9 @@ const bookAppointment = async (req, res) => {
       gender,
     } = req.body;
 
-    if (!symptoms || !visitType || !emergencyLevel || !scheduledDate || !scheduledSlot) {
+    if (!symptoms || !visitType || !scheduledDate || !scheduledSlot) {
       return res.status(400).json({
-        message: 'symptoms, visitType, emergencyLevel, scheduledDate, and scheduledSlot are required',
+        message: 'symptoms, visitType, scheduledDate, and scheduledSlot are required',
       });
     }
 
@@ -198,7 +238,11 @@ const bookAppointment = async (req, res) => {
     const resolvedAge = age || patientProfile?.age;
     const resolvedGender = gender || patientProfile?.gender;
 
-    const predictedCategory = await predictSpecialization(symptoms);
+    // AI Triage
+    const triage = await triageSymptoms(symptoms, resolvedAge, resolvedGender, visitType);
+    const emergencyLevel = triage.emergencyLevel;
+    const predictedCategory = triage.doctorSpecialization;
+
     const predictedDuration = await predictDuration(
       resolvedAge,
       symptoms,
@@ -230,8 +274,9 @@ const bookAppointment = async (req, res) => {
       visitType,
       previousVisits: previousVisits || 0,
       emergencyLevel,
+      aiEmergencyLevel: emergencyLevel,
       predictedCategory,
-      consultationMode: consultationMode || 'video',
+      consultationMode: consultationMode || 'pending',
       predictedDuration,
       priorityScore: 0,
       type: 'scheduled',
@@ -271,4 +316,146 @@ const getMyAppointments = async (req, res) => {
   }
 };
 
-module.exports = { joinQueue, getMyQueue, getHistory, bookAppointment, getMyAppointments };
+/**
+ * Urgent Request: Patient submits immediate symptoms for urgent processing.
+ * Groq triages instantly and sends a live WebSocket popup to the matching doctor.
+ * If doctor doesn't accept in 30 seconds, auto-assigns to next available.
+ */
+const urgentRequest = async (req, res) => {
+  try {
+    const io = getIo();
+    const { symptoms } = req.body;
+
+    if (!symptoms) {
+      return res.status(400).json({ message: 'symptoms are required' });
+    }
+
+    const patientUser = await User.findById(req.user.id);
+    const patientProfile = await Patient.findOne({ userId: req.user.id });
+
+    const resolvedAge = patientProfile?.age;
+    const resolvedGender = patientProfile?.gender;
+
+    // Instant AI triage
+    const triage = await triageSymptoms(symptoms, resolvedAge, resolvedGender, 'Urgent');
+    const emergencyLevel = Math.max(triage.emergencyLevel, 4); // Urgent = at least level 4
+    const predictedCategory = triage.doctorSpecialization;
+    const isCritical = triage.isCriticalOperationToday;
+
+    const predictedDuration = await predictDuration(resolvedAge, symptoms, emergencyLevel, 0);
+
+    // Find matching doctor
+    let assignedDoctor = await findBestDoctor(predictedCategory);
+    if (!assignedDoctor) {
+      assignedDoctor = await Doctor.findOne({ isOnline: true }).sort({ currentQueueLength: 1 });
+    }
+
+    if (!assignedDoctor) {
+      return res.status(400).json({ message: 'No online doctors available for urgent request' });
+    }
+
+    const priorityScore = calculatePriorityScore(emergencyLevel, 0, 0) + (isCritical ? 1000 : 500);
+
+    const consultation = await Consultation.create({
+      patientId: req.user.id,
+      doctorId: assignedDoctor.userId,
+      symptoms,
+      visitType: 'Urgent',
+      previousVisits: 0,
+      emergencyLevel: isCritical ? 5 : emergencyLevel,
+      aiEmergencyLevel: triage.emergencyLevel,
+      predictedCategory,
+      isCritical,
+      consultationMode: 'pending',
+      predictedDuration,
+      priorityScore,
+      type: 'live',
+      age: resolvedAge,
+      gender: resolvedGender,
+      patientName: patientUser.name,
+    });
+
+    await Doctor.findOneAndUpdate(
+      { userId: assignedDoctor.userId },
+      { $inc: { currentQueueLength: 1 } }
+    );
+
+    if (io) {
+      // Send urgent popup to the doctor
+      io.to(`doctor:${assignedDoctor.userId}`).emit('urgent:request', {
+        message: `URGENT: Patient ${patientUser.name} needs immediate consultation.`,
+        consultation,
+        patientName: patientUser.name,
+        symptoms,
+        emergencyLevel,
+      });
+
+      // 30-second auto-reassign if doctor doesn't accept
+      setTimeout(async () => {
+        try {
+          const check = await Consultation.findById(consultation._id);
+          if (check && check.status === 'waiting') {
+            const nextDoctor = await Doctor.findOne({
+              isOnline: true,
+              userId: { $ne: assignedDoctor.userId },
+            }).sort({ currentQueueLength: 1 });
+
+            if (nextDoctor) {
+              check.doctorId = nextDoctor.userId;
+              await check.save();
+
+              await Doctor.findOneAndUpdate(
+                { userId: assignedDoctor.userId },
+                { $inc: { currentQueueLength: -1 } }
+              );
+              await Doctor.findOneAndUpdate(
+                { userId: nextDoctor.userId },
+                { $inc: { currentQueueLength: 1 } }
+              );
+
+              io.to(`patient:${req.user.id}`).emit('patient:reassigned', {
+                message: 'Doctor did not respond. You have been assigned to another available doctor.',
+                newDoctorId: nextDoctor.userId,
+                consultationId: consultation._id,
+              });
+              io.to(`doctor:${nextDoctor.userId}`).emit('urgent:request', {
+                message: `URGENT (reassigned): Patient ${patientUser.name} needs immediate consultation.`,
+                consultation: check,
+                patientName: patientUser.name,
+                symptoms,
+                emergencyLevel,
+              });
+              io.to(`doctor:${nextDoctor.userId}`).emit('queue:updated', {
+                queue: await reorderQueue(nextDoctor.userId),
+              });
+            }
+          }
+        } catch (err) {
+          console.error('Urgent auto-reassign error:', err.message);
+        }
+      }, 30 * 1000);
+
+      io.to('admin').emit('admin:urgent-request', {
+        message: `Urgent request from ${patientUser.name}`,
+        consultation,
+      });
+    }
+
+    res.status(201).json({
+      consultation,
+      assignedDoctor: {
+        userId: assignedDoctor.userId,
+        specialization: assignedDoctor.specialization,
+      },
+      triage: {
+        emergencyLevel,
+        specialization: predictedCategory,
+        isCritical,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+module.exports = { joinQueue, getMyQueue, getHistory, bookAppointment, getMyAppointments, urgentRequest };
