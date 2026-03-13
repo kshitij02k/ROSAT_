@@ -11,17 +11,23 @@ os.makedirs(MODELS_DIR, exist_ok=True)
 np.random.seed(42)
 n = 200
 
+BASE_DURATION      = 10   # minimum consultation minutes
+EMERGENCY_WEIGHT   = 3    # extra minutes per emergency level
+AGE_WEIGHT         = 0.1  # extra minutes per year of age
+VISIT_WEIGHT       = 2    # extra minutes per previous visit
+NOISE_RANGE        = 10   # max random noise in minutes
+
 age             = np.random.randint(18, 81, n)
 emergency_level = np.random.randint(1, 6, n)
 previous_visits = np.random.randint(0, 6, n)
 symptoms_length = np.random.randint(20, 501, n)
 
 duration = (
-    10
-    + emergency_level * 3
-    + age * 0.1
-    + previous_visits * 2
-    + np.random.uniform(0, 10, n)
+    BASE_DURATION
+    + emergency_level * EMERGENCY_WEIGHT
+    + age * AGE_WEIGHT
+    + previous_visits * VISIT_WEIGHT
+    + np.random.uniform(0, NOISE_RANGE, n)
 )
 
 X = np.column_stack([age, emergency_level, previous_visits, symptoms_length])
