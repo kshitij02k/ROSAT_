@@ -35,6 +35,16 @@ export function PatientDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Urgent Request state
+  const [showUrgent, setShowUrgent] = useState(false);
+  const [urgentSymptoms, setUrgentSymptoms] = useState('');
+  const [urgentLoading, setUrgentLoading] = useState(false);
+  const [urgentResult, setUrgentResult] = useState(null);
+
+  // Consultation mode selection popup
+  const [showModeSelect, setShowModeSelect] = useState(false);
+  const [modeConsultationId, setModeConsultationId] = useState(null);
+
   const fetchAll = useCallback(async () => {
     try {
       const [qRes, apptRes, histRes] = await Promise.allSettled([
@@ -70,17 +80,58 @@ export function PatientDashboard() {
         prev ? { ...prev, estimatedWait: data.estimatedWait } : prev
       );
     };
+    const handleConsultationStarted = (data) => {
+      // When doctor starts session, prompt patient for consultation mode
+      setModeConsultationId(data.consultationId);
+      setShowModeSelect(true);
+      fetchAll();
+    };
+    const handleReassigned = () => {
+      fetchAll();
+    };
 
     socket.on('queue:updated', handleQueueUpdate);
     socket.on('patient:wait-updated', handleWaitUpdate);
     socket.on('patient:called', fetchAll);
+    socket.on('consultation:started', handleConsultationStarted);
+    socket.on('patient:reassigned', handleReassigned);
 
     return () => {
       socket.off('queue:updated', handleQueueUpdate);
       socket.off('patient:wait-updated', handleWaitUpdate);
       socket.off('patient:called', fetchAll);
+      socket.off('consultation:started', handleConsultationStarted);
+      socket.off('patient:reassigned', handleReassigned);
     };
   }, [fetchAll]);
+
+  const handleUrgentSubmit = async () => {
+    if (!urgentSymptoms.trim()) return;
+    setUrgentLoading(true);
+    try {
+      const res = await patientApi.urgentRequest({ symptoms: urgentSymptoms });
+      setUrgentResult(res.data);
+      setShowUrgent(false);
+      setUrgentSymptoms('');
+      fetchAll();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Urgent request failed.');
+    } finally {
+      setUrgentLoading(false);
+    }
+  };
+
+  const handleModeSelect = (mode) => {
+    const socket = getSocket();
+    if (socket && modeConsultationId) {
+      socket.emit('consultation:select-mode', {
+        consultationId: modeConsultationId,
+        mode,
+      });
+    }
+    setShowModeSelect(false);
+    navigate(`/patient/consultation/${modeConsultationId}`);
+  };
 
   if (loading) {
     return (
@@ -158,7 +209,9 @@ export function PatientDashboard() {
                 <div>
                   <div className="text-xs text-gray-500 mb-1">Consultation Mode</div>
                   <span className={`${badgeBase} bg-blue-100 text-blue-700`}>
-                    {queueEntry.consultationMode === 'video' ? '📹 Video Call' : '💬 Chat'}
+                    {queueEntry.consultationMode === 'video' ? '📹 Video Call'
+                      : queueEntry.consultationMode === 'chat' ? '💬 Chat'
+                      : '📋 Pending Selection'}
                   </span>
                 </div>
                 <div>
@@ -305,9 +358,101 @@ export function PatientDashboard() {
             </div>
           )}
         </div>
+
+        {/* Urgent Appointment Button */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">🚨 Need Immediate Help?</h2>
+              <p className="text-sm text-gray-500 mt-1">Request an urgent consultation processed by AI instantly.</p>
+            </div>
+            <button
+              className="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition text-sm"
+              onClick={() => setShowUrgent(true)}
+            >
+              🚨 Urgent Request
+            </button>
+          </div>
+          {urgentResult && (
+            <div className="mt-4 bg-green-50 border border-green-200 text-green-800 p-3 rounded-lg text-sm">
+              ✅ Urgent request submitted. AI Level: {urgentResult.triage?.emergencyLevel}, Specialist: {urgentResult.triage?.specialization}. You will be connected shortly.
+            </div>
+          )}
+        </div>
       </div>
 
-      <NotificationBar userRole="patient" />
+      {/* Urgent Request Modal */}
+      {showUrgent && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full">
+            <div className="text-4xl mb-3 text-center">🚨</div>
+            <h2 className="text-xl font-bold text-red-600 text-center">Urgent Consultation Request</h2>
+            <p className="text-gray-600 text-sm mt-2 text-center">
+              Describe your symptoms. AI will instantly triage and connect you with the appropriate doctor.
+            </p>
+            <textarea
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm mt-4 focus:outline-none focus:ring-2 focus:ring-red-500"
+              rows={4}
+              value={urgentSymptoms}
+              onChange={(e) => setUrgentSymptoms(e.target.value)}
+              placeholder="Describe your urgent symptoms in detail…"
+            />
+            <div className="flex gap-3 mt-4 justify-end">
+              <button
+                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium"
+                onClick={() => { setShowUrgent(false); setUrgentSymptoms(''); }}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg transition font-semibold flex items-center gap-2"
+                onClick={handleUrgentSubmit}
+                disabled={urgentLoading || !urgentSymptoms.trim()}
+              >
+                {urgentLoading ? (
+                  <>
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Processing…
+                  </>
+                ) : (
+                  '🚨 Submit Urgent Request'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Consultation Mode Selection Modal */}
+      {showModeSelect && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full">
+            <div className="text-4xl mb-3 text-center">🎉</div>
+            <h2 className="text-xl font-bold text-gray-900 text-center">Your Consultation is Ready!</h2>
+            <p className="text-gray-600 text-sm mt-2 text-center">
+              How would you like to consult?
+            </p>
+            <div className="grid grid-cols-2 gap-4 mt-6">
+              <button
+                className="p-6 rounded-xl border-2 border-gray-200 cursor-pointer text-center hover:border-primary transition"
+                onClick={() => handleModeSelect('chat')}
+              >
+                <div className="text-3xl mb-2">💬</div>
+                <div className="font-semibold text-sm text-gray-800">Start Chat</div>
+                <div className="text-xs text-gray-500 mt-1">Text-based consultation</div>
+              </button>
+              <button
+                className="p-6 rounded-xl border-2 border-gray-200 cursor-pointer text-center hover:border-primary transition"
+                onClick={() => handleModeSelect('video')}
+              >
+                <div className="text-3xl mb-2">📹</div>
+                <div className="font-semibold text-sm text-gray-800">Start Video Call</div>
+                <div className="text-xs text-gray-500 mt-1">Face-to-face consultation</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
