@@ -9,7 +9,7 @@ const getQueue = async (req, res) => {
     if (!doctor) return res.status(404).json({ message: 'Doctor profile not found' });
 
     const queue = await reorderQueue(req.user.id);
-    res.json({ queue, currentQueueLength: queue.length });
+    res.json({ queue, currentQueueLength: queue.length, isOnline: doctor.isOnline });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -169,7 +169,21 @@ const getDoctors = async (req, res) => {
     if (isOnline !== undefined) query.isOnline = isOnline === 'true';
 
     const doctors = await Doctor.find(query).populate('userId', 'name email');
-    res.json({ doctors });
+
+    // Flatten the response so frontend gets name/email/userId at top level
+    const flatDoctors = doctors.map((d) => ({
+      _id: d._id,
+      userId: d.userId?._id || d.userId,
+      name: d.userId?.name || 'Unknown',
+      email: d.userId?.email || '',
+      specialization: d.specialization,
+      experience: d.experience,
+      isOnline: d.isOnline,
+      currentQueueLength: d.currentQueueLength,
+      queueLength: d.currentQueueLength,
+    }));
+
+    res.json({ doctors: flatDoctors });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

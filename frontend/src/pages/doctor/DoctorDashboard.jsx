@@ -46,6 +46,13 @@ export function DoctorDashboard() {
   const [sessionElapsed, setSessionElapsed] = useState(0);
   const timerRef = useRef(null);
 
+  // Urgent request popup
+  const [urgentPopup, setUrgentPopup] = useState(null);
+
+  // Emergency bell for critical operations
+  const [emergencyBell, setEmergencyBell] = useState(false);
+  const [consultationMode, setConsultationMode] = useState(null);
+
   const fetchDashboard = useCallback(async () => {
     try {
       const [qRes, cpRes] = await Promise.allSettled([
@@ -54,11 +61,13 @@ export function DoctorDashboard() {
       ]);
       if (qRes.status === 'fulfilled') {
         const data = qRes.value.data;
-        setIsOnline(data.isOnline ?? data.doctor?.isOnline ?? false);
-        setQueue(data.queue || data || []);
+        setIsOnline(data.isOnline ?? false);
+        setQueue(data.queue || []);
       }
       if (cpRes.status === 'fulfilled') {
-        setCurrentPatient(cpRes.value.data?.patient || cpRes.value.data || null);
+        // Backend returns { consultation }, extract the consultation object
+        const cpData = cpRes.value.data;
+        setCurrentPatient(cpData?.consultation || null);
       }
     } catch {
       setError('Failed to load queue data.');
@@ -75,8 +84,38 @@ export function DoctorDashboard() {
     const socket = getSocket();
     if (!socket) return;
     socket.on('queue:updated', fetchDashboard);
-    return () => socket.off('queue:updated', fetchDashboard);
+
+    // Urgent request popup
+    socket.on('urgent:request', (data) => {
+      setUrgentPopup(data);
+      // If critical, trigger emergency bell
+      if (data.emergencyLevel >= 5) {
+        setEmergencyBell(true);
+        setTimeout(() => setEmergencyBell(false), 10000);
+      }
+    });
+
+    // Patient selected consultation mode
+    socket.on('consultation:mode-selected', (data) => {
+      setConsultationMode(data.mode);
+      fetchDashboard();
+    });
+
+    return () => {
+      socket.off('queue:updated', fetchDashboard);
+      socket.off('urgent:request');
+      socket.off('consultation:mode-selected');
+    };
   }, [fetchDashboard]);
+
+  const handleAcceptUrgent = () => {
+    const socket = getSocket();
+    if (socket && urgentPopup?.consultation?._id) {
+      socket.emit('urgent:accept', { consultationId: urgentPopup.consultation._id });
+    }
+    setUrgentPopup(null);
+    fetchDashboard();
+  };
 
   useEffect(() => {
     if (currentPatient && currentPatient.status === 'in-progress') {
@@ -214,7 +253,7 @@ export function DoctorDashboard() {
                 <div>
                   <div className="text-xs text-gray-500 mb-1">Patient Name</div>
                   <div className="font-bold text-lg text-gray-900">
-                    {currentPatient.name || currentPatient.patientName || '—'}
+                    {currentPatient.patientName || currentPatient.patientId?.name || currentPatient.name || '—'}
                   </div>
                 </div>
                 <div>
@@ -227,7 +266,9 @@ export function DoctorDashboard() {
                 <div>
                   <div className="text-xs text-gray-500 mb-1">Mode</div>
                   <span className={`${badgeBase} bg-blue-100 text-blue-700`}>
-                    {currentPatient.consultationMode === 'video' ? '📹 Video' : '💬 Chat'}
+                    {currentPatient.consultationMode === 'video' ? '📹 Video'
+                      : currentPatient.consultationMode === 'chat' ? '💬 Chat'
+                      : '📋 Pending'}
                   </span>
                 </div>
                 <div>
@@ -350,7 +391,7 @@ export function DoctorDashboard() {
                     >
                       <td className="px-4 py-3 border-t border-gray-100 font-bold">{idx + 1}</td>
                       <td className="px-4 py-3 border-t border-gray-100 font-semibold">
-                        {entry.name || entry.patientName || '—'}
+                        {entry.patientName || entry.patientId?.name || entry.name || '—'}
                       </td>
                       <td className="px-4 py-3 border-t border-gray-100">
                         <span className={emergencyBadgeClass(entry.emergencyLevel)}>
@@ -387,6 +428,68 @@ export function DoctorDashboard() {
           )}
         </div>
       </div>
+
+      {/* Emergency Bell Alert */}
+      {emergencyBell && (
+        <div className="fixed top-16 inset-x-0 z-50 flex justify-center p-4">
+          <div className="bg-red-500 text-white rounded-2xl shadow-2xl p-4 max-w-lg w-full flex items-center gap-3">
+            <span className="text-3xl">🚨</span>
+            <div>
+              <div className="font-bold">CRITICAL EMERGENCY</div>
+              <div className="text-sm">A critical patient requires immediate attention!</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Urgent Request Popup */}
+      {urgentPopup && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full">
+            <div className="text-4xl mb-3 text-center">🚨</div>
+            <h2 className="text-xl font-bold text-red-600 text-center">Urgent Patient Request</h2>
+            <p className="text-gray-600 text-sm mt-2 text-center">
+              {urgentPopup.message}
+            </p>
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs text-gray-500">Patient</div>
+                  <div className="font-semibold text-sm">{urgentPopup.patientName}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Emergency Level</div>
+                  <span className={emergencyBadgeClass(urgentPopup.emergencyLevel)}>
+                    Level {urgentPopup.emergencyLevel}
+                  </span>
+                </div>
+                <div className="col-span-2">
+                  <div className="text-xs text-gray-500">Symptoms</div>
+                  <div className="text-sm text-gray-900">{urgentPopup.symptoms}</div>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-4 justify-end">
+              <button
+                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium"
+                onClick={() => setUrgentPopup(null)}
+              >
+                Decline
+              </button>
+              <button
+                className="px-4 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg transition font-semibold"
+                onClick={handleAcceptUrgent}
+              >
+                ✅ Accept Urgent Patient
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-3 text-center">
+              Auto-reassigns to another doctor in 30 seconds if not accepted.
+            </p>
+          </div>
+        </div>
+      )}
+
       <NotificationBar userRole="doctor" />
     </div>
   );

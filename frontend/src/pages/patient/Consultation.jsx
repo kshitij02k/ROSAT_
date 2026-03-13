@@ -12,39 +12,133 @@ function formatTime(seconds) {
   return `${prefix}${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-function VideoCall({ onToggleMic, onToggleCam, micOn, camOn, doctorName }) {
+function VideoCall({ onToggleMic, onToggleCam, micOn, camOn, doctorName, consultationId, doctorId }) {
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
+  const peerRef = useRef(null);
+  const localStreamRef = useRef(null);
+  const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const startWebRTC = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localStreamRef.current = stream;
+        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+        });
+        peerRef.current = pc;
+
+        stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+        pc.ontrack = (event) => {
+          if (remoteVideoRef.current) remoteVideoRef.current.srcObject = event.streams[0];
+          setConnected(true);
+        };
+
+        pc.onicecandidate = (event) => {
+          if (event.candidate) {
+            socket.emit('webrtc:ice-candidate', {
+              recipientId: doctorId,
+              candidate: event.candidate,
+              consultationId,
+            });
+          }
+        };
+
+        // Create offer
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit('webrtc:offer', {
+          recipientId: doctorId,
+          offer,
+          consultationId,
+        });
+      } catch (err) {
+        console.error('WebRTC setup error:', err);
+      }
+    };
+
+    const handleAnswer = async (data) => {
+      if (peerRef.current && data.answer) {
+        await peerRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
+      }
+    };
+
+    const handleIceCandidate = async (data) => {
+      if (peerRef.current && data.candidate) {
+        try {
+          await peerRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } catch (err) {
+          console.error('ICE candidate error:', err);
+        }
+      }
+    };
+
+    socket.on('webrtc:answer', handleAnswer);
+    socket.on('webrtc:ice-candidate', handleIceCandidate);
+
+    startWebRTC();
+
+    return () => {
+      socket.off('webrtc:answer', handleAnswer);
+      socket.off('webrtc:ice-candidate', handleIceCandidate);
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      if (peerRef.current) peerRef.current.close();
+    };
+  }, [consultationId, doctorId]);
+
+  // Toggle mic/camera on local stream
+  useEffect(() => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getAudioTracks().forEach((t) => { t.enabled = micOn; });
+    }
+  }, [micOn]);
+
+  useEffect(() => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getVideoTracks().forEach((t) => { t.enabled = camOn; });
+    }
+  }, [camOn]);
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
       <div className="bg-gray-900 rounded-2xl aspect-video relative flex items-center justify-center mb-4">
-        <div className="text-center">
-          <div className="text-5xl mb-2">👨‍⚕️</div>
-          <div className="text-slate-400 text-sm">Dr. {doctorName || 'Doctor'}</div>
-          <div className="text-slate-500 text-xs mt-1">Video connected</div>
-        </div>
-        <div className="absolute bottom-3 right-3 w-16 h-16 bg-gray-700 rounded-xl flex items-center justify-center">
-          <span className="text-xl">🧑</span>
+        <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full rounded-2xl" style={{ objectFit: 'cover' }} />
+        {!connected && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-5xl mb-2">👨‍⚕️</div>
+              <div className="text-slate-400 text-sm">Dr. {doctorName || 'Doctor'}</div>
+              <div className="text-slate-500 text-xs mt-1">Connecting video…</div>
+            </div>
+          </div>
+        )}
+        <div className="absolute bottom-3 right-3 w-20 h-16 bg-gray-700 rounded-xl overflow-hidden">
+          <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full" style={{ objectFit: 'cover' }} />
         </div>
       </div>
       <div className="flex justify-center gap-3">
         <button
-          className={`p-3 rounded-full text-2xl ${micOn ? 'bg-gray-700 text-white' : 'bg-red-600 text-white'}`}
+          className={`p-3 rounded-full text-2xl ${micOn ? 'bg-gray-700 text-white' : 'bg-red-500 text-white'}`}
           onClick={onToggleMic}
           title={micOn ? 'Mute microphone' : 'Unmute microphone'}
         >
           {micOn ? '🎙️' : '🔇'}
         </button>
         <button
-          className={`p-3 rounded-full text-2xl ${camOn ? 'bg-gray-700 text-white' : 'bg-red-600 text-white'}`}
+          className={`p-3 rounded-full text-2xl ${camOn ? 'bg-gray-700 text-white' : 'bg-red-500 text-white'}`}
           onClick={onToggleCam}
           title={camOn ? 'Turn off camera' : 'Turn on camera'}
         >
           {camOn ? '📹' : '📷'}
-        </button>
-        <button
-          className="p-3 rounded-full text-2xl bg-slate-600 text-white"
-          title="Screen share"
-        >
-          🖥️
         </button>
       </div>
     </div>
@@ -164,34 +258,44 @@ export function Consultation() {
     if (!socket) return;
 
     const handleMsg = (data) => {
+      // Avoid displaying messages we sent ourselves
+      if (data.senderId === socket.auth?.userId) return;
       setMessages((prev) => [
         ...prev,
         {
           sender: 'doctor',
-          text: data.text || data.message || data,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          text: data.message || data.text || data,
+          time: new Date(data.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
     };
 
     socket.on('chat:message', handleMsg);
     socket.on('session:ended', () => navigate('/patient/dashboard'));
+    socket.on('consultation:ended', () => navigate('/patient/dashboard'));
 
     return () => {
       socket.off('chat:message', handleMsg);
       socket.off('session:ended');
+      socket.off('consultation:ended');
     };
   }, [navigate]);
 
   const handleSend = (text) => {
     const socket = getSocket();
+    const recipientId = consultation?.doctorId || consultation?.doctor?._id;
+    if (!socket || !recipientId) return;
     const msg = {
       sender: 'patient',
       text,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     setMessages((prev) => [...prev, msg]);
-    socket?.emit('chat:send', { sessionId: id, text });
+    socket.emit('chat:message', {
+      consultationId: id,
+      recipientId,
+      message: text,
+    });
   };
 
   if (loading) {
@@ -271,6 +375,8 @@ export function Consultation() {
             camOn={camOn}
             onToggleMic={() => setMicOn((v) => !v)}
             onToggleCam={() => setCamOn((v) => !v)}
+            consultationId={id}
+            doctorId={consultation?.doctorId || consultation?.doctor?._id}
           />
         ) : (
           <ChatInterface

@@ -69,6 +69,42 @@ export function NotificationBar({ userRole }) {
           data.message || "It's your turn! Please join the session.",
           'success'
         );
+      handlers['consultation:started'] = (data) =>
+        addNotification(
+          data.message || 'Your consultation has started! Please select your preferred mode.',
+          'success'
+        );
+      handlers['patient:reassigned'] = (data) =>
+        addNotification(
+          data.message || 'You have been reassigned to another doctor.',
+          'warning'
+        );
+      handlers['patient:position-update'] = (data) =>
+        addNotification(
+          data.message || `Your queue position is now #${data.position}.`,
+          'info'
+        );
+    }
+
+    // Cascade effect: delay notification for all waiting patients
+    handlers['queue:delay-update'] = (data) =>
+      addNotification(
+        data.message || 'The doctor is handling a critical case. Your wait time has been updated.',
+        'warning'
+      );
+
+    // Critical surge alert for admins
+    if (userRole === 'admin') {
+      handlers['admin:critical-surge'] = (data) =>
+        addNotification(
+          data.message || '🚨 Critical surge detected! No doctors available for critical patient.',
+          'danger'
+        );
+      handlers['admin:urgent-request'] = (data) =>
+        addNotification(
+          data.message || 'Urgent patient request received.',
+          'danger'
+        );
     }
 
     Object.entries(handlers).forEach(([event, handler]) => {

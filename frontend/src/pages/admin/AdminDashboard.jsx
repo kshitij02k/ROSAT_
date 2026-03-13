@@ -601,6 +601,7 @@ export function AdminDashboard() {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [criticalAlerts, setCriticalAlerts] = useState([]);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -631,9 +632,30 @@ export function AdminDashboard() {
     if (!socket) return;
     socket.on('queue:updated', fetchAll);
     socket.on('admin:alert', fetchAll);
+
+    // Critical surge alerts
+    socket.on('admin:critical-surge', (data) => {
+      setCriticalAlerts((prev) => [...prev, {
+        id: Date.now(),
+        message: data.message || 'Critical patient surge! No doctors available.',
+        timestamp: new Date().toLocaleTimeString(),
+      }]);
+    });
+
+    // Urgent request alerts
+    socket.on('admin:urgent-request', (data) => {
+      setCriticalAlerts((prev) => [...prev, {
+        id: Date.now(),
+        message: data.message || 'Urgent patient request.',
+        timestamp: new Date().toLocaleTimeString(),
+      }]);
+    });
+
     return () => {
       socket.off('queue:updated', fetchAll);
       socket.off('admin:alert', fetchAll);
+      socket.off('admin:critical-surge');
+      socket.off('admin:urgent-request');
     };
   }, [fetchAll]);
 
@@ -670,6 +692,27 @@ export function AdminDashboard() {
         {error && (
           <div className="bg-amber-50 border border-amber-200 text-amber-700 p-3 rounded-lg flex items-center gap-2 text-sm mb-6">
             <span>⚠️</span> <span>{error}</span>
+          </div>
+        )}
+
+        {/* Critical Surge Alerts */}
+        {criticalAlerts.length > 0 && (
+          <div className="mb-6 space-y-3">
+            {criticalAlerts.map((alert) => (
+              <div key={alert.id} className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg flex items-center gap-3">
+                <span className="text-2xl">🚨</span>
+                <div className="flex-1">
+                  <div className="font-semibold text-sm">{alert.message}</div>
+                  <div className="text-xs text-red-500 mt-1">{alert.timestamp}</div>
+                </div>
+                <button
+                  className="text-red-400 hover:text-red-600 text-lg"
+                  onClick={() => setCriticalAlerts((prev) => prev.filter((a) => a.id !== alert.id))}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
           </div>
         )}
 

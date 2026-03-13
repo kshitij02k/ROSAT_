@@ -13,42 +13,11 @@ const EMERGENCY_LABELS = {
   5: 'Critical'
 };
 
-const STEPS = ['Patient Info', 'Medical Details', 'Doctor Selection', 'Confirm'];
+const STEPS = ['Patient Info', 'Symptoms', 'Doctor Selection', 'Confirm'];
 
 const inputClass =
   'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition';
 const labelClass = 'block text-sm font-medium text-gray-700 mb-1';
-
-function EmergencyWarningModal({ level, onConfirm, onChange }) {
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full">
-        <div className="text-4xl mb-3 text-center">⚠️</div>
-        <h2 className="text-xl font-bold text-red-600 text-center">High Emergency Warning</h2>
-        <p className="text-gray-700 text-sm mt-2 text-center">
-          You selected <strong>Level {level} – {EMERGENCY_LABELS[level]}</strong>.{' '}
-          Selecting a high emergency level is reserved for <strong>genuinely severe cases</strong>.
-          Misuse may result in a <strong>fine or queue penalty</strong>.
-          Please confirm only if your condition truly warrants urgent attention.
-        </p>
-        <div className="flex gap-3 mt-6 justify-end">
-          <button
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium"
-            onClick={onChange}
-          >
-            ← Change Level
-          </button>
-          <button
-            className="px-4 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg transition font-semibold"
-            onClick={onConfirm}
-          >
-            I Understand – Proceed
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function JoinQueue() {
   const { user } = useAuth();
@@ -68,12 +37,9 @@ export function JoinQueue() {
   });
 
   const [medical, setMedical] = useState({
-    symptoms: '',
-    emergencyLevel: 1,
-    consultationMode: 'video'
+    symptoms: ''
   });
-  const [showWarning, setShowWarning] = useState(false);
-  const [pendingLevel, setPendingLevel] = useState(null);
+  const [triageResult, setTriageResult] = useState(null);
 
   const [mlSpec, setMlSpec] = useState('');
   const [mlLoading, setMlLoading] = useState(false);
@@ -125,26 +91,6 @@ export function JoinQueue() {
     }
   };
 
-  const handleEmergencySelect = (level) => {
-    if (level >= 4) {
-      setPendingLevel(level);
-      setShowWarning(true);
-    } else {
-      setMedical((m) => ({ ...m, emergencyLevel: level }));
-    }
-  };
-
-  const confirmEmergency = () => {
-    setMedical((m) => ({ ...m, emergencyLevel: pendingLevel }));
-    setShowWarning(false);
-    setPendingLevel(null);
-  };
-
-  const cancelEmergency = () => {
-    setShowWarning(false);
-    setPendingLevel(null);
-  };
-
   const handleSubmit = async () => {
     setLoading(true);
     setError('');
@@ -154,16 +100,14 @@ export function JoinQueue() {
         age: Number(patientInfo.age),
         gender: patientInfo.gender,
         visitType: patientInfo.visitType,
-        previousVisitCount: patientInfo.visitType === 'Follow-up'
+        previousVisits: patientInfo.visitType === 'Follow-up'
           ? Number(patientInfo.previousVisitCount)
           : 0,
         symptoms: medical.symptoms,
-        emergencyLevel: medical.emergencyLevel,
-        consultationMode: medical.consultationMode,
         doctorId: selectedDoctor !== 'auto' ? selectedDoctor : undefined,
-        predictedSpecialization: mlSpec
       };
       const res = await patientApi.joinQueue(payload);
+      setTriageResult(res.data.triage || null);
       setSuccess(res.data);
       setStep(4);
     } catch (err) {
@@ -176,23 +120,6 @@ export function JoinQueue() {
       setLoading(false);
     }
   };
-
-  function getEmergencyButtonClass(level) {
-    const isSelected = medical.emergencyLevel === level;
-    if (level <= 2) {
-      return isSelected
-        ? 'border-green-500 bg-green-50 text-green-700'
-        : 'border-gray-200 hover:border-green-400 text-gray-700';
-    }
-    if (level === 3) {
-      return isSelected
-        ? 'border-amber-500 bg-amber-50 text-amber-700'
-        : 'border-gray-200 hover:border-amber-400 text-gray-700';
-    }
-    return isSelected
-      ? 'border-red-500 bg-red-50 text-red-700'
-      : 'border-gray-200 hover:border-red-400 text-gray-700';
-  }
 
   const renderStepper = () => (
     <div className="flex items-center justify-between mb-8">
@@ -298,66 +225,22 @@ export function JoinQueue() {
 
   const renderStep1 = () => (
     <div>
-      <h2 className="text-base font-semibold text-gray-900 mb-4">🩺 Medical Details</h2>
+      <h2 className="text-base font-semibold text-gray-900 mb-4">🩺 Describe Your Symptoms</h2>
       <div className="mb-4">
         <label className={labelClass}>Symptoms / Chief Complaint *</label>
         <textarea
           className={inputClass}
-          rows={4}
+          rows={5}
           value={medical.symptoms}
           onChange={(e) => setMedical((m) => ({ ...m, symptoms: e.target.value }))}
-          placeholder="Describe your symptoms in detail…"
+          placeholder="Describe your symptoms in detail. Be as specific as possible — our AI will determine the emergency level and appropriate specialist automatically."
         />
       </div>
-
-      <div className="mb-4">
-        <label className={labelClass}>Emergency Level *</label>
-        <div className="grid grid-cols-5 gap-2 mb-2">
-          {[1, 2, 3, 4, 5].map((level) => (
-            <button
-              key={level}
-              type="button"
-              className={`p-3 rounded-xl border-2 text-center cursor-pointer transition ${getEmergencyButtonClass(level)}`}
-              onClick={() => handleEmergencySelect(level)}
-            >
-              <div className="text-lg font-bold">{level}</div>
-              <div className="text-xs mt-0.5">{EMERGENCY_LABELS[level]}</div>
-            </button>
-          ))}
-        </div>
-        <p className="text-sm text-gray-600">
-          Selected: <strong>Level {medical.emergencyLevel} – {EMERGENCY_LABELS[medical.emergencyLevel]}</strong>
-        </p>
-      </div>
-
-      <div className="mb-4">
-        <label className={labelClass}>Consultation Mode *</label>
-        <div className="grid grid-cols-2 gap-4">
-          <div
-            className={`p-6 rounded-xl border-2 cursor-pointer text-center hover:border-primary transition ${
-              medical.consultationMode === 'video'
-                ? 'border-primary bg-blue-50'
-                : 'border-gray-200'
-            }`}
-            onClick={() => setMedical((m) => ({ ...m, consultationMode: 'video' }))}
-          >
-            <div className="text-3xl mb-2">📹</div>
-            <div className="font-semibold text-sm text-gray-800">Video Call</div>
-            <div className="text-xs text-gray-500 mt-1">Face-to-face consultation</div>
-          </div>
-          <div
-            className={`p-6 rounded-xl border-2 cursor-pointer text-center hover:border-primary transition ${
-              medical.consultationMode === 'chat'
-                ? 'border-primary bg-blue-50'
-                : 'border-gray-200'
-            }`}
-            onClick={() => setMedical((m) => ({ ...m, consultationMode: 'chat' }))}
-          >
-            <div className="text-3xl mb-2">💬</div>
-            <div className="font-semibold text-sm text-gray-800">Chat</div>
-            <div className="text-xs text-gray-500 mt-1">Text-based consultation</div>
-          </div>
-        </div>
+      <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-lg flex items-center gap-2 text-sm">
+        <span>🤖</span>
+        <span>
+          <strong>AI-Powered Triage:</strong> Our system will automatically analyze your symptoms to determine the appropriate emergency level, specialist, and priority. No manual selection needed.
+        </span>
       </div>
     </div>
   );
@@ -405,13 +288,15 @@ export function JoinQueue() {
           {doctors.length > 0 && (
             <div className="mb-4">
               <label className={labelClass}>Or choose a specific doctor</label>
-              {doctors.map((doc) => (
+              {doctors.map((doc) => {
+                const docKey = doc.userId || doc._id || doc.id;
+                return (
                 <div
-                  key={doc._id || doc.id}
+                  key={docKey}
                   className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer hover:border-primary transition mb-3 ${
-                    selectedDoctor === (doc._id || doc.id) ? 'border-primary bg-blue-50' : 'border-gray-200'
+                    selectedDoctor === docKey ? 'border-primary bg-blue-50' : 'border-gray-200'
                   }`}
-                  onClick={() => setSelectedDoctor(doc._id || doc.id)}
+                  onClick={() => setSelectedDoctor(docKey)}
                 >
                   <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
                     {doc.name?.charAt(0).toUpperCase() || 'D'}
@@ -421,13 +306,14 @@ export function JoinQueue() {
                     <div className="text-xs text-gray-500">{doc.specialization}</div>
                   </div>
                   <div className="text-xs text-gray-500">Queue: {doc.queueLength ?? 0}</div>
-                  {selectedDoctor === (doc._id || doc.id) && (
+                  {selectedDoctor === docKey && (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
                       Selected
                     </span>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -461,39 +347,27 @@ export function JoinQueue() {
           </div>
           <div>
             <div className="text-xs text-gray-500">Consultation Mode</div>
-            <div className="font-semibold text-sm text-gray-900">
-              {medical.consultationMode === 'video' ? '📹 Video' : '💬 Chat'}
-            </div>
+            <div className="font-semibold text-sm text-gray-900">📋 Will be selected when doctor starts</div>
           </div>
           <div className="col-span-2">
             <div className="text-xs text-gray-500">Symptoms</div>
             <div className="font-semibold text-sm text-gray-900">{medical.symptoms}</div>
           </div>
           <div>
-            <div className="text-xs text-gray-500">Emergency Level</div>
-            <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                medical.emergencyLevel <= 2
-                  ? 'bg-green-100 text-green-700'
-                  : medical.emergencyLevel === 3
-                  ? 'bg-amber-100 text-amber-700'
-                  : 'bg-red-100 text-red-700'
-              }`}
-            >
-              Level {medical.emergencyLevel} – {EMERGENCY_LABELS[medical.emergencyLevel]}
-            </span>
+            <div className="text-xs text-gray-500">Triage</div>
+            <div className="font-semibold text-sm text-gray-900">🤖 AI will determine emergency level</div>
           </div>
           <div>
             <div className="text-xs text-gray-500">Specialization</div>
-            <div className="font-semibold text-sm text-gray-900">{mlSpec || 'Auto-detect'}</div>
+            <div className="font-semibold text-sm text-gray-900">{mlSpec || 'AI will determine'}</div>
           </div>
           <div>
             <div className="text-xs text-gray-500">Doctor</div>
             <div className="font-semibold text-sm text-gray-900">
               {selectedDoctor === 'auto'
                 ? '🤖 Auto-Assign'
-                : doctors.find((d) => (d._id || d.id) === selectedDoctor)?.name
-                  ? `Dr. ${doctors.find((d) => (d._id || d.id) === selectedDoctor)?.name}`
+                : doctors.find((d) => (d.userId || d._id || d.id) === selectedDoctor)?.name
+                  ? `Dr. ${doctors.find((d) => (d.userId || d._id || d.id) === selectedDoctor)?.name}`
                   : 'Selected'}
             </div>
           </div>
@@ -507,25 +381,48 @@ export function JoinQueue() {
       <div className="text-center py-8">
         <div className="text-5xl mb-3">🎉</div>
         <div className="text-2xl font-bold text-gray-900">You're in the Queue!</div>
-        <div className="text-gray-500 text-sm mt-1">Your request has been submitted successfully.</div>
+        <div className="text-gray-500 text-sm mt-1">AI has analyzed your symptoms and placed you in the optimal queue.</div>
       </div>
-      <div className="bg-gradient-to-br from-primary to-primary-dark text-white rounded-2xl p-6 mb-6">
-        <div className="text-6xl font-black text-center">#{success?.position ?? '—'}</div>
-        <div className="text-center text-sm opacity-75 mt-1">Your position in queue</div>
-        <div className="grid grid-cols-3 gap-4 mt-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold">{success?.patientsAhead ?? 0}</div>
-            <div className="text-sm opacity-75">Patients Ahead</div>
+
+      {triageResult && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+          <div className="font-semibold text-sm text-blue-800 mb-2">🤖 AI Triage Results</div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <div className="text-xs text-gray-500">Emergency Level</div>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                triageResult.emergencyLevel <= 2 ? 'bg-green-100 text-green-700'
+                  : triageResult.emergencyLevel === 3 ? 'bg-amber-100 text-amber-700'
+                  : 'bg-red-100 text-red-700'
+              }`}>
+                Level {triageResult.emergencyLevel} – {EMERGENCY_LABELS[triageResult.emergencyLevel]}
+              </span>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Specialist</div>
+              <div className="font-semibold text-sm text-gray-900">{triageResult.specialization}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Critical</div>
+              <div className="font-semibold text-sm text-gray-900">{triageResult.isCritical ? '🚨 Yes' : '✅ No'}</div>
+            </div>
           </div>
+        </div>
+      )}
+
+      <div className="bg-gradient-to-br from-primary to-primary-dark text-white rounded-2xl p-6 mb-6">
+        <div className="text-6xl font-black text-center">#{success?.queuePosition ?? '—'}</div>
+        <div className="text-center text-sm opacity-75 mt-1">Your position in queue</div>
+        <div className="grid grid-cols-2 gap-4 mt-4">
           <div className="text-center">
-            <div className="text-2xl font-bold">{success?.estimatedWait ?? '—'} min</div>
+            <div className="text-2xl font-bold">{success?.predictedWaitTime ?? '—'} min</div>
             <div className="text-sm opacity-75">Est. Wait Time</div>
           </div>
           <div className="text-center">
             <div className="text-lg font-bold">
-              {success?.doctorName ? `Dr. ${success.doctorName}` : '—'}
+              {success?.assignedDoctor?.specialization || '—'}
             </div>
-            <div className="text-sm opacity-75">Assigned Doctor</div>
+            <div className="text-sm opacity-75">Assigned Specialist</div>
           </div>
         </div>
       </div>
@@ -604,14 +501,6 @@ export function JoinQueue() {
           )}
         </div>
       </div>
-
-      {showWarning && (
-        <EmergencyWarningModal
-          level={pendingLevel}
-          onConfirm={confirmEmergency}
-          onChange={cancelEmergency}
-        />
-      )}
 
       <NotificationBar userRole="patient" />
     </div>

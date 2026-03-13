@@ -139,6 +139,98 @@ io.on('connection', (socket) => {
     io.to(`patient:${patientId}`).emit('patient:position-update', { position, message });
   });
 
+  // ── Consultation Mode Selection ─────────────────────────────────────────
+  socket.on('consultation:select-mode', async (data) => {
+    try {
+      const { consultationId, mode } = data;
+      const Consultation = require('./models/Consultation');
+      const consultation = await Consultation.findById(consultationId);
+      if (consultation) {
+        consultation.consultationMode = mode;
+        await consultation.save();
+
+        // Notify both patient and doctor
+        io.to(`doctor:${consultation.doctorId}`).emit('consultation:mode-selected', {
+          consultationId,
+          mode,
+          patientId: consultation.patientId,
+        });
+        io.to(`patient:${consultation.patientId}`).emit('consultation:mode-selected', {
+          consultationId,
+          mode,
+        });
+      }
+    } catch (err) {
+      console.error('consultation:select-mode error:', err.message);
+    }
+  });
+
+  // ── Live Chat Messages ──────────────────────────────────────────────────
+  socket.on('chat:message', (data) => {
+    const { consultationId, recipientId, message, senderName } = data;
+    io.to(`patient:${recipientId}`).to(`doctor:${recipientId}`).emit('chat:message', {
+      consultationId,
+      senderId: user.id,
+      senderName: senderName || user.name,
+      message,
+      timestamp: new Date().toISOString(),
+    });
+    // Echo back to sender for confirmation
+    socket.emit('chat:message', {
+      consultationId,
+      senderId: user.id,
+      senderName: senderName || user.name,
+      message,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  // ── WebRTC Signaling ────────────────────────────────────────────────────
+  socket.on('webrtc:offer', (data) => {
+    const { recipientId } = data;
+    io.to(`patient:${recipientId}`).to(`doctor:${recipientId}`).emit('webrtc:offer', {
+      ...data,
+      senderId: user.id,
+    });
+  });
+
+  socket.on('webrtc:answer', (data) => {
+    const { recipientId } = data;
+    io.to(`patient:${recipientId}`).to(`doctor:${recipientId}`).emit('webrtc:answer', {
+      ...data,
+      senderId: user.id,
+    });
+  });
+
+  socket.on('webrtc:ice-candidate', (data) => {
+    const { recipientId } = data;
+    io.to(`patient:${recipientId}`).to(`doctor:${recipientId}`).emit('webrtc:ice-candidate', {
+      ...data,
+      senderId: user.id,
+    });
+  });
+
+  // ── Urgent Request Accept ────────────────────────────────────────────────
+  socket.on('urgent:accept', async (data) => {
+    try {
+      const { consultationId } = data;
+      const Consultation = require('./models/Consultation');
+      const consultation = await Consultation.findById(consultationId);
+      if (consultation && consultation.status === 'waiting') {
+        consultation.status = 'in-progress';
+        consultation.startedAt = new Date();
+        await consultation.save();
+
+        io.to(`patient:${consultation.patientId}`).emit('consultation:started', {
+          message: 'Your urgent consultation has been accepted. Please join now.',
+          consultationId: consultation._id,
+        });
+      }
+    } catch (err) {
+      console.error('urgent:accept error:', err.message);
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log(`Socket disconnected: ${user.name}`);
   });
