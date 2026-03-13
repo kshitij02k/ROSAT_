@@ -10,6 +10,14 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+frontend/dist
+frontend/node_modules
+backend/node_modules
+__pycache__
+*.pyc
+*.pyo
+.env
+ml_service/__pycache__
 *.local
 
 # Editor directories and files
