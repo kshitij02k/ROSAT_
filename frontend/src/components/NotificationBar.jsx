@@ -8,6 +8,13 @@ const ICONS = {
   danger: '🚨'
 };
 
+const TYPE_CLASS = {
+  info: 'bg-blue-50 border-blue-200 text-blue-800',
+  success: 'bg-green-50 border-green-200 text-green-800',
+  warning: 'bg-amber-50 border-amber-200 text-amber-800',
+  danger: 'bg-red-50 border-red-200 text-red-800'
+};
+
 let _id = 0;
 
 export function NotificationBar({ userRole }) {
@@ -48,7 +55,6 @@ export function NotificationBar({ userRole }) {
         addNotification(data.message || data, data.type || 'warning')
     };
 
-    // Role-specific events
     if (userRole === 'doctor') {
       handlers['doctor:inaction-alert'] = () =>
         addNotification(
@@ -60,7 +66,7 @@ export function NotificationBar({ userRole }) {
     if (userRole === 'patient') {
       handlers['patient:called'] = (data) =>
         addNotification(
-          data.message || 'It\'s your turn! Please join the session.',
+          data.message || "It's your turn! Please join the session.",
           'success'
         );
     }
@@ -79,13 +85,16 @@ export function NotificationBar({ userRole }) {
   if (notifications.length === 0) return null;
 
   return (
-    <div className="notification-container">
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full">
       {notifications.map((n) => (
-        <div key={n.id} className={`notification-bar ${n.type}`}>
-          <span className="notification-icon">{ICONS[n.type] || ICONS.info}</span>
-          <span className="notification-text">{n.message}</span>
+        <div
+          key={n.id}
+          className={`flex items-start gap-3 p-3 rounded-xl shadow-lg border text-sm font-medium ${TYPE_CLASS[n.type] || TYPE_CLASS.info}`}
+        >
+          <span className="text-base">{ICONS[n.type] || ICONS.info}</span>
+          <span className="flex-1">{n.message}</span>
           <button
-            className="notification-close"
+            className="ml-auto opacity-60 hover:opacity-100 text-lg leading-none"
             onClick={() => dismiss(n.id)}
             aria-label="Dismiss"
           >

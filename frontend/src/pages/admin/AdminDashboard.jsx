@@ -32,10 +32,28 @@ ChartJS.register(
 );
 
 const EMERGENCY_LABELS = { 1: 'Mild', 2: 'Moderate', 3: 'Significant', 4: 'Severe', 5: 'Critical' };
-const STATUS_BADGE = { waiting: 'badge-warning', 'in-progress': 'badge-success', completed: 'badge-secondary' };
-const EMERGENCY_BADGE = { 1: 'badge-success', 2: 'badge-success', 3: 'badge-warning', 4: 'badge-danger', 5: 'badge-danger' };
-
 const CHART_COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'];
+
+const badgeBase = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold';
+
+function statusBadgeClass(status) {
+  if (status === 'waiting') return `${badgeBase} bg-amber-100 text-amber-700`;
+  if (status === 'in-progress') return `${badgeBase} bg-green-100 text-green-700`;
+  return `${badgeBase} bg-gray-100 text-gray-600`;
+}
+
+function emergencyBadgeClass(level) {
+  if (level <= 2) return `${badgeBase} bg-green-100 text-green-700`;
+  if (level === 3) return `${badgeBase} bg-amber-100 text-amber-700`;
+  return `${badgeBase} bg-red-100 text-red-700`;
+}
+
+function priorityBadgeClass(level) {
+  if (level <= 2) return `${badgeBase} bg-green-100 text-green-700`;
+  if (level === 3) return `${badgeBase} bg-amber-100 text-amber-700`;
+  if (level === 4) return `${badgeBase} bg-orange-100 text-orange-700`;
+  return `${badgeBase} bg-red-100 text-red-700`;
+}
 
 // ─── Tab 1: Overview ───────────────────────────────────────────────────────────
 function OverviewTab({ globalQueues, allDoctors, analytics }) {
@@ -48,61 +66,55 @@ function OverviewTab({ globalQueues, allDoctors, analytics }) {
 
   return (
     <div>
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon">👥</div>
-          <div className="stat-value">{totalPatients}</div>
-          <div className="stat-label">Patients Today</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">👨‍⚕️</div>
-          <div className="stat-value">{activeDoctors}</div>
-          <div className="stat-label">Active Doctors</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">⏱️</div>
-          <div className="stat-value">{avgWait} min</div>
-          <div className="stat-label">Avg Wait Time</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">🚨</div>
-          <div className="stat-value">{emergencyCases}</div>
-          <div className="stat-label">Emergency Cases (4+)</div>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {[
+          { icon: '👥', value: totalPatients, label: 'Patients Today' },
+          { icon: '👨‍⚕️', value: activeDoctors, label: 'Active Doctors' },
+          { icon: '⏱️', value: `${avgWait} min`, label: 'Avg Wait Time' },
+          { icon: '🚨', value: emergencyCases, label: 'Emergency Cases (4+)' }
+        ].map(({ icon, value, label }) => (
+          <div key={label} className="bg-white rounded-2xl border border-gray-100 p-5 flex items-center gap-4">
+            <div className="text-3xl">{icon}</div>
+            <div>
+              <div className="text-3xl font-black text-gray-900">{value}</div>
+              <div className="text-sm text-gray-500">{label}</div>
+            </div>
+          </div>
+        ))}
       </div>
 
-      <div className="card">
-        <div className="card-title">👨‍⚕️ All Doctors</div>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <h2 className="text-base font-semibold text-gray-900 mb-4">👨‍⚕️ All Doctors</h2>
         {allDoctors.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-state-desc">No doctors registered.</div>
-          </div>
+          <div className="text-center py-8 text-sm text-gray-500">No doctors registered.</div>
         ) : (
-          <div className="table-wrapper">
-            <table>
-              <thead>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
                 <tr>
-                  <th>Name</th>
-                  <th>Specialization</th>
-                  <th>Status</th>
-                  <th>Queue Length</th>
-                  <th>Experience</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Name</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Specialization</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Queue Length</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Experience</th>
                 </tr>
               </thead>
               <tbody>
                 {allDoctors.map((doc, idx) => (
                   <tr key={doc._id || idx}>
-                    <td style={{ fontWeight: 600 }}>Dr. {doc.name}</td>
-                    <td>{doc.specialization || '—'}</td>
-                    <td>
-                      <span className={`badge ${doc.isOnline ? 'badge-success' : 'badge-secondary'}`}>
+                    <td className="px-4 py-3 border-t border-gray-100 font-semibold">Dr. {doc.name}</td>
+                    <td className="px-4 py-3 border-t border-gray-100">{doc.specialization || '—'}</td>
+                    <td className="px-4 py-3 border-t border-gray-100">
+                      <span className={`${badgeBase} ${doc.isOnline ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
                         {doc.isOnline ? '🟢 Online' : '⚫ Offline'}
                       </span>
                     </td>
-                    <td>
-                      <span className="badge badge-info">{doc.queueLength ?? 0}</span>
+                    <td className="px-4 py-3 border-t border-gray-100">
+                      <span className={`${badgeBase} bg-blue-100 text-blue-700`}>{doc.queueLength ?? 0}</span>
                     </td>
-                    <td>{doc.experience != null ? `${doc.experience} yrs` : '—'}</td>
+                    <td className="px-4 py-3 border-t border-gray-100">
+                      {doc.experience != null ? `${doc.experience} yrs` : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -117,67 +129,70 @@ function OverviewTab({ globalQueues, allDoctors, analytics }) {
 // ─── Tab 2: Queue Monitor ──────────────────────────────────────────────────────
 function QueueMonitorTab({ globalQueues }) {
   return (
-    <div className="card">
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 16
-        }}
-      >
-        <div className="card-title" style={{ marginBottom: 0 }}>
-          🌐 Live Global Queue
-        </div>
-        <span className="badge badge-info">{globalQueues.length} entries</span>
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-base font-semibold text-gray-900">🌐 Live Global Queue</h2>
+        <span className={`${badgeBase} bg-blue-100 text-blue-700`}>{globalQueues.length} entries</span>
       </div>
 
       {globalQueues.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">✅</div>
-          <div className="empty-state-title">All Clear</div>
-          <div className="empty-state-desc">No active queue entries.</div>
+        <div className="text-center py-8 text-gray-500">
+          <div className="text-3xl mb-2">✅</div>
+          <div className="font-semibold text-gray-700 mb-1">All Clear</div>
+          <div className="text-sm">No active queue entries.</div>
         </div>
       ) : (
-        <div className="table-wrapper">
-          <table>
-            <thead>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
               <tr>
-                <th>Patient</th>
-                <th>Doctor</th>
-                <th>Specialization</th>
-                <th>Emergency</th>
-                <th>Status</th>
-                <th>Wait Time</th>
-                <th>Priority Score</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Patient</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Doctor</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Specialization</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Emergency</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Wait Time</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Priority Score</th>
               </tr>
             </thead>
             <tbody>
               {globalQueues.map((entry, idx) => (
                 <tr
                   key={entry._id || idx}
-                  className={`emergency-${Math.min(entry.emergencyLevel || 1, 5)}`}
+                  className={
+                    entry.emergencyLevel <= 2
+                      ? 'bg-green-50'
+                      : entry.emergencyLevel === 3
+                      ? 'bg-amber-50'
+                      : 'bg-red-50'
+                  }
                 >
-                  <td style={{ fontWeight: 600 }}>{entry.patientName || entry.name || '—'}</td>
-                  <td>{entry.doctorName ? `Dr. ${entry.doctorName}` : '—'}</td>
-                  <td>{entry.specialization || entry.doctorSpecialization || '—'}</td>
-                  <td>
-                    <span className={`badge ${EMERGENCY_BADGE[entry.emergencyLevel] || 'badge-secondary'}`}>
+                  <td className="px-4 py-3 border-t border-gray-100 font-semibold">
+                    {entry.patientName || entry.name || '—'}
+                  </td>
+                  <td className="px-4 py-3 border-t border-gray-100">
+                    {entry.doctorName ? `Dr. ${entry.doctorName}` : '—'}
+                  </td>
+                  <td className="px-4 py-3 border-t border-gray-100">
+                    {entry.specialization || entry.doctorSpecialization || '—'}
+                  </td>
+                  <td className="px-4 py-3 border-t border-gray-100">
+                    <span className={emergencyBadgeClass(entry.emergencyLevel)}>
                       {entry.emergencyLevel} – {EMERGENCY_LABELS[entry.emergencyLevel] || '—'}
                     </span>
                   </td>
-                  <td>
-                    <span className={`badge ${STATUS_BADGE[entry.status] || 'badge-secondary'}`}>
+                  <td className="px-4 py-3 border-t border-gray-100">
+                    <span className={statusBadgeClass(entry.status)}>
                       {entry.status || '—'}
                     </span>
                   </td>
-                  <td>{entry.waitTime != null ? `${entry.waitTime} min` : '—'}</td>
-                  <td>
-                    <div
-                      className={`priority-badge priority-${Math.min(entry.emergencyLevel || 1, 5)}`}
-                    >
+                  <td className="px-4 py-3 border-t border-gray-100">
+                    {entry.waitTime != null ? `${entry.waitTime} min` : '—'}
+                  </td>
+                  <td className="px-4 py-3 border-t border-gray-100">
+                    <span className={priorityBadgeClass(entry.emergencyLevel || 1)}>
                       {entry.priorityScore != null ? entry.priorityScore.toFixed(1) : '—'}
-                    </div>
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -193,8 +208,8 @@ function QueueMonitorTab({ globalQueues }) {
 function AnalyticsTab({ analytics }) {
   if (!analytics) {
     return (
-      <div className="loading-spinner">
-        <div className="spinner" />
+      <div className="flex items-center gap-3 justify-center py-12 text-gray-500">
+        <div className="animate-spin h-6 w-6 rounded-full border-2 border-primary border-t-transparent" />
         <span>Loading analytics…</span>
       </div>
     );
@@ -274,59 +289,52 @@ function AnalyticsTab({ analytics }) {
 
   return (
     <div>
-      {/* KPI row */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        <div className="stat-card">
-          <div className="stat-icon">⏱️</div>
-          <div className="stat-value">{analytics.avgWaitTime?.toFixed(1) ?? '—'} min</div>
-          <div className="stat-label">Avg Wait Time</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">📈</div>
-          <div className="stat-value">{analytics.maxWaitTime?.toFixed(1) ?? '—'} min</div>
-          <div className="stat-label">Max Wait Time</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">💤</div>
-          <div className="stat-value">{analytics.doctorIdleTime?.toFixed(1) ?? '—'} min</div>
-          <div className="stat-label">Doctor Idle Time</div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {[
+          { icon: '⏱️', value: `${analytics.avgWaitTime?.toFixed(1) ?? '—'} min`, label: 'Avg Wait Time' },
+          { icon: '📈', value: `${analytics.maxWaitTime?.toFixed(1) ?? '—'} min`, label: 'Max Wait Time' },
+          { icon: '💤', value: `${analytics.doctorIdleTime?.toFixed(1) ?? '—'} min`, label: 'Doctor Idle Time' }
+        ].map(({ icon, value, label }) => (
+          <div key={label} className="bg-white rounded-2xl border border-gray-100 p-5 flex items-center gap-4">
+            <div className="text-3xl">{icon}</div>
+            <div>
+              <div className="text-3xl font-black text-gray-900">{value}</div>
+              <div className="text-sm text-gray-500">{label}</div>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* Charts row 1 */}
-      <div className="charts-grid">
-        <div className="card">
-          <div className="card-title">⏱️ Avg Wait by Specialization</div>
-          <div className="chart-container">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">⏱️ Avg Wait by Specialization</h2>
+          <div className="h-64">
             <Bar data={barChartData} options={chartOptions} />
           </div>
         </div>
-        <div className="card">
-          <div className="card-title">📈 Consultations (Last 7 Days)</div>
-          <div className="chart-container">
+        <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">📈 Consultations (Last 7 Days)</h2>
+          <div className="h-64">
             <Line data={lineChartData} options={chartOptions} />
           </div>
         </div>
       </div>
 
-      {/* Charts row 2 */}
-      <div className="charts-grid">
-        <div className="card">
-          <div className="card-title">🥧 Consultation Mode Distribution</div>
-          <div className="chart-container-sm">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">🥧 Consultation Mode Distribution</h2>
+          <div className="h-64">
             <Pie data={pieChartData} options={chartOptions} />
           </div>
         </div>
-        <div className="card">
-          <div className="card-title">⚡ FIFO vs Optimized</div>
-          <div className="chart-container-sm">
+        <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">⚡ FIFO vs Optimized</h2>
+          <div className="h-64">
             <Bar data={comparisonData} options={{ ...chartOptions, indexAxis: 'x' }} />
           </div>
-          <div style={{ textAlign: 'center', marginTop: 12, fontSize: 14, color: 'var(--secondary)' }}>
+          <div className="text-center mt-3 text-sm text-gray-600">
             Optimization saves{' '}
-            <strong>
-              {fifoAvg > optimizedAvg ? improvement : 0}% wait time
-            </strong>
+            <strong>{fifoAvg > optimizedAvg ? improvement : 0}% wait time</strong>
           </div>
         </div>
       </div>
@@ -388,120 +396,113 @@ function SimulationTab() {
           metric: 'Max Wait Time (min)',
           fifo: (result.fifo?.maxWaitTime ?? 0).toFixed(1),
           optimized: (result.optimized?.maxWaitTime ?? 0).toFixed(1),
-          improvement: result.fifo?.maxWaitTime > 0
-            ? `${(((result.fifo.maxWaitTime - result.optimized.maxWaitTime) / result.fifo.maxWaitTime) * 100).toFixed(1)}%`
-            : '0%',
+          improvement:
+            result.fifo?.maxWaitTime > 0
+              ? `${(
+                  ((result.fifo.maxWaitTime - result.optimized.maxWaitTime) /
+                    result.fifo.maxWaitTime) *
+                  100
+                ).toFixed(1)}%`
+              : '0%',
           positive: result.optimized?.maxWaitTime < result.fifo?.maxWaitTime
         },
         {
           metric: 'Emergency Response Time (min)',
           fifo: (result.fifo?.emergencyResponseTime ?? 0).toFixed(1),
           optimized: (result.optimized?.emergencyResponseTime ?? 0).toFixed(1),
-          improvement: result.fifo?.emergencyResponseTime > 0
-            ? `${(((result.fifo.emergencyResponseTime - result.optimized.emergencyResponseTime) / result.fifo.emergencyResponseTime) * 100).toFixed(1)}%`
-            : '0%',
-          positive: result.optimized?.emergencyResponseTime < result.fifo?.emergencyResponseTime
+          improvement:
+            result.fifo?.emergencyResponseTime > 0
+              ? `${(
+                  ((result.fifo.emergencyResponseTime -
+                    result.optimized.emergencyResponseTime) /
+                    result.fifo.emergencyResponseTime) *
+                  100
+                ).toFixed(1)}%`
+              : '0%',
+          positive:
+            result.optimized?.emergencyResponseTime <
+            result.fifo?.emergencyResponseTime
         },
         {
           metric: 'Doctor Idle Time (min)',
           fifo: (result.fifo?.doctorIdleTime ?? 0).toFixed(1),
           optimized: (result.optimized?.doctorIdleTime ?? 0).toFixed(1),
-          improvement: result.fifo?.doctorIdleTime > 0
-            ? `${(((result.fifo.doctorIdleTime - result.optimized.doctorIdleTime) / result.fifo.doctorIdleTime) * 100).toFixed(1)}%`
-            : '0%',
-          positive: result.optimized?.doctorIdleTime < result.fifo?.doctorIdleTime
+          improvement:
+            result.fifo?.doctorIdleTime > 0
+              ? `${(
+                  ((result.fifo.doctorIdleTime - result.optimized.doctorIdleTime) /
+                    result.fifo.doctorIdleTime) *
+                  100
+                ).toFixed(1)}%`
+              : '0%',
+          positive:
+            result.optimized?.doctorIdleTime < result.fifo?.doctorIdleTime
         }
       ]
     : [];
 
   return (
     <div>
-      <div className="card">
-        <div className="card-title">⚙️ Simulation Parameters</div>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+        <h2 className="text-base font-semibold text-gray-900 mb-4">⚙️ Simulation Parameters</h2>
 
         {error && (
-          <div className="alert alert-danger">
+          <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg flex items-center gap-2 text-sm mb-4">
             <span>⚠️</span> <span>{error}</span>
           </div>
         )}
 
-        <div className="slider-group">
-          <label>
-            <span>Patient Count</span>
-            <strong>{patientCount}</strong>
-          </label>
+        <div className="mb-5">
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-sm font-medium text-gray-700">Patient Count</label>
+            <strong className="text-sm font-bold text-gray-900">{patientCount}</strong>
+          </div>
           <input
             type="range"
             min="1"
             max="100"
             value={patientCount}
             onChange={(e) => setPatientCount(Number(e.target.value))}
+            className="w-full accent-primary"
           />
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              fontSize: 12,
-              color: 'var(--text-muted)',
-              marginTop: 4
-            }}
-          >
-            <span>1</span>
-            <span>50</span>
-            <span>100</span>
+          <div className="flex justify-between text-xs text-gray-400 mt-1">
+            <span>1</span><span>50</span><span>100</span>
           </div>
         </div>
 
-        <div className="slider-group">
-          <label>
-            <span>Emergency Rate (%)</span>
-            <strong>{emergencyRate}%</strong>
-          </label>
+        <div className="mb-5">
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-sm font-medium text-gray-700">Emergency Rate (%)</label>
+            <strong className="text-sm font-bold text-gray-900">{emergencyRate}%</strong>
+          </div>
           <input
             type="range"
             min="0"
             max="100"
             value={emergencyRate}
             onChange={(e) => setEmergencyRate(Number(e.target.value))}
+            className="w-full accent-primary"
           />
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              fontSize: 12,
-              color: 'var(--text-muted)',
-              marginTop: 4
-            }}
-          >
-            <span>0%</span>
-            <span>50%</span>
-            <span>100%</span>
+          <div className="flex justify-between text-xs text-gray-400 mt-1">
+            <span>0%</span><span>50%</span><span>100%</span>
           </div>
         </div>
 
-        <div
-          style={{
-            padding: '14px 16px',
-            background: '#f8fafc',
-            borderRadius: 8,
-            fontSize: 14,
-            marginBottom: 20,
-            color: 'var(--text-muted)'
-          }}
-        >
+        <div className="p-4 bg-gray-50 rounded-lg text-sm text-gray-600 mb-5">
           Simulating <strong>{patientCount} patients</strong> with{' '}
           <strong>{emergencyRate}% emergency rate</strong> (~
-          {Math.round(patientCount * emergencyRate / 100)} emergency cases)
+          {Math.round((patientCount * emergencyRate) / 100)} emergency cases)
         </div>
 
         <button
-          className="btn btn-primary btn-lg"
+          className="px-6 py-2.5 bg-primary hover:bg-primary-dark text-white font-semibold rounded-lg transition flex items-center gap-2 disabled:opacity-60"
           onClick={runSimulation}
           disabled={loading}
         >
           {loading ? (
             <>
-              <div className="spinner spinner-sm" /> Running Simulation…
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Running Simulation…
             </>
           ) : (
             '▶️ Run Simulation'
@@ -511,10 +512,10 @@ function SimulationTab() {
 
       {result && (
         <>
-          <div className="charts-grid">
-            <div className="card">
-              <div className="card-title">📊 Wait Time Comparison</div>
-              <div className="chart-container">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <h2 className="text-base font-semibold text-gray-900 mb-4">📊 Wait Time Comparison</h2>
+              <div className="h-64">
                 <Bar
                   data={simChartData}
                   options={{
@@ -531,78 +532,21 @@ function SimulationTab() {
                 />
               </div>
             </div>
-            <div className="card">
-              <div className="card-title">✅ Results Summary</div>
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 16,
-                  marginTop: 8
-                }}
-              >
-                <div
-                  style={{
-                    padding: 16,
-                    background: '#fef2f2',
-                    borderRadius: 10,
-                    borderLeft: '4px solid #ef4444'
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: '#991b1b',
-                      marginBottom: 4
-                    }}
-                  >
-                    FIFO Algorithm
-                  </div>
-                  <div style={{ fontSize: 24, fontWeight: 900, color: '#ef4444' }}>
-                    {fifoAvg.toFixed(1)} min avg wait
-                  </div>
-                  <div style={{ fontSize: 13, color: '#991b1b', marginTop: 4 }}>
-                    Max: {(result.fifo?.maxWaitTime ?? 0).toFixed(1)} min
-                  </div>
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <h2 className="text-base font-semibold text-gray-900 mb-4">✅ Results Summary</h2>
+              <div className="flex flex-col gap-4">
+                <div className="p-4 bg-red-50 rounded-xl border-l-4 border-red-500">
+                  <div className="text-xs font-bold text-red-800 mb-1">FIFO Algorithm</div>
+                  <div className="text-2xl font-black text-red-500">{fifoAvg.toFixed(1)} min avg wait</div>
+                  <div className="text-xs text-red-700 mt-1">Max: {(result.fifo?.maxWaitTime ?? 0).toFixed(1)} min</div>
                 </div>
-                <div
-                  style={{
-                    padding: 16,
-                    background: '#d1fae5',
-                    borderRadius: 10,
-                    borderLeft: '4px solid #10b981'
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: '#065f46',
-                      marginBottom: 4
-                    }}
-                  >
-                    Optimized Algorithm
-                  </div>
-                  <div style={{ fontSize: 24, fontWeight: 900, color: '#10b981' }}>
-                    {optAvg.toFixed(1)} min avg wait
-                  </div>
-                  <div style={{ fontSize: 13, color: '#065f46', marginTop: 4 }}>
-                    Max: {(result.optimized?.maxWaitTime ?? 0).toFixed(1)} min
-                  </div>
+                <div className="p-4 bg-green-50 rounded-xl border-l-4 border-green-500">
+                  <div className="text-xs font-bold text-green-800 mb-1">Optimized Algorithm</div>
+                  <div className="text-2xl font-black text-green-500">{optAvg.toFixed(1)} min avg wait</div>
+                  <div className="text-xs text-green-700 mt-1">Max: {(result.optimized?.maxWaitTime ?? 0).toFixed(1)} min</div>
                 </div>
                 {parseFloat(improvement) > 0 && (
-                  <div
-                    style={{
-                      textAlign: 'center',
-                      padding: '12px',
-                      background: '#eff6ff',
-                      borderRadius: 10,
-                      fontSize: 15,
-                      fontWeight: 700,
-                      color: 'var(--primary)'
-                    }}
-                  >
+                  <div className="text-center p-3 bg-blue-50 rounded-xl text-sm font-bold text-primary">
                     🚀 {improvement}% improvement in wait time!
                   </div>
                 )}
@@ -610,31 +554,29 @@ function SimulationTab() {
             </div>
           </div>
 
-          <div className="card">
-            <div className="card-title">📋 Detailed Comparison</div>
-            <div className="table-wrapper">
-              <table className="comparison-table">
-                <thead>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <h2 className="text-base font-semibold text-gray-900 mb-4">📋 Detailed Comparison</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead className="bg-gray-50">
                   <tr>
-                    <th>Metric</th>
-                    <th style={{ color: '#ef4444' }}>FIFO</th>
-                    <th style={{ color: '#10b981' }}>Optimized</th>
-                    <th>Improvement</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase border border-gray-200">Metric</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-red-500 uppercase border border-gray-200">FIFO</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-green-500 uppercase border border-gray-200">Optimized</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase border border-gray-200">Improvement</th>
                   </tr>
                 </thead>
                 <tbody>
                   {metrics.map((m, i) => (
                     <tr key={i}>
-                      <td style={{ fontWeight: 600 }}>{m.metric}</td>
-                      <td style={{ color: '#ef4444', fontWeight: 700 }}>{m.fifo}</td>
-                      <td style={{ color: '#10b981', fontWeight: 700 }}>{m.optimized}</td>
-                      <td>
+                      <td className="px-4 py-3 border border-gray-200 font-semibold">{m.metric}</td>
+                      <td className="px-4 py-3 border border-gray-200 font-bold text-red-500">{m.fifo}</td>
+                      <td className="px-4 py-3 border border-gray-200 font-bold text-green-500">{m.optimized}</td>
+                      <td className="px-4 py-3 border border-gray-200">
                         <span
-                          className={
-                            m.positive
-                              ? 'improvement-positive'
-                              : 'improvement-negative'
-                          }
+                          className={`font-semibold ${
+                            m.positive ? 'text-green-600' : 'text-red-500'
+                          }`}
                         >
                           {m.positive ? '↑' : '↓'} {m.improvement}
                         </span>
@@ -697,12 +639,12 @@ export function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="page-wrapper">
+      <div className="min-h-screen bg-gray-50 pt-16">
         <Navbar />
-        <div className="loading-full">
-          <div className="loading-spinner">
-            <div className="spinner" />
-            <span>Loading admin dashboard…</span>
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-50">
+          <div className="flex flex-col items-center gap-3">
+            <div className="animate-spin h-8 w-8 rounded-full border-4 border-primary border-t-transparent" />
+            <span className="text-sm text-gray-500">Loading admin dashboard…</span>
           </div>
         </div>
       </div>
@@ -717,32 +659,29 @@ export function AdminDashboard() {
   ];
 
   return (
-    <div className="page-wrapper">
+    <div className="min-h-screen bg-gray-50 pt-16">
       <Navbar />
-      <div
-        style={{
-          paddingTop: 'var(--navbar-height)',
-          maxWidth: 1200,
-          margin: '0 auto',
-          padding: '80px 20px 60px'
-        }}
-      >
-        <div className="page-header">
-          <h1 className="page-title">⚙️ Admin Dashboard</h1>
-          <p className="page-subtitle">Monitor and manage the entire telemedicine system.</p>
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">⚙️ Admin Dashboard</h1>
+          <p className="text-gray-500 mt-1">Monitor and manage the entire telemedicine system.</p>
         </div>
 
         {error && (
-          <div className="alert alert-warning">
+          <div className="bg-amber-50 border border-amber-200 text-amber-700 p-3 rounded-lg flex items-center gap-2 text-sm mb-6">
             <span>⚠️</span> <span>{error}</span>
           </div>
         )}
 
-        <div className="tabs">
+        <div className="flex border-b border-gray-200 mb-6 gap-1">
           {tabs.map((tab) => (
             <button
               key={tab.key}
-              className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
+              className={`px-4 py-2 text-sm font-medium cursor-pointer transition ${
+                activeTab === tab.key
+                  ? 'border-b-2 border-primary text-primary'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
               onClick={() => setActiveTab(tab.key)}
             >
               {tab.label}
@@ -751,11 +690,7 @@ export function AdminDashboard() {
         </div>
 
         {activeTab === 'overview' && (
-          <OverviewTab
-            globalQueues={globalQueues}
-            allDoctors={allDoctors}
-            analytics={analytics}
-          />
+          <OverviewTab globalQueues={globalQueues} allDoctors={allDoctors} analytics={analytics} />
         )}
         {activeTab === 'queue' && <QueueMonitorTab globalQueues={globalQueues} />}
         {activeTab === 'analytics' && <AnalyticsTab analytics={analytics} />}

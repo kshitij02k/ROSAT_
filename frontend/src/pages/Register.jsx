@@ -15,6 +15,10 @@ const SPECIALIZATIONS = [
 
 const GENDERS = ['Male', 'Female', 'Other', 'Prefer not to say'];
 
+const inputClass =
+  'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition';
+const labelClass = 'block text-sm font-medium text-gray-700 mb-1';
+
 export function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -24,10 +28,8 @@ export function Register() {
     email: '',
     password: '',
     role: 'patient',
-    // doctor fields
     specialization: '',
     experience: '',
-    // patient fields
     age: '',
     gender: ''
   });
@@ -85,14 +87,14 @@ export function Register() {
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-card" style={{ maxWidth: 520 }}>
-        <div className="auth-logo">🏥</div>
-        <h1 className="auth-title">Create Account</h1>
-        <p className="auth-subtitle">Join TeleQueue today</p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-xl">
+        <div className="text-5xl text-center mb-4">🏥</div>
+        <h1 className="text-2xl font-bold text-gray-900 text-center">Create Account</h1>
+        <p className="text-gray-500 text-center mb-6">Join TeleQueue today</p>
 
         {error && (
-          <div className="alert alert-danger">
+          <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg flex items-center gap-2 text-sm mb-4">
             <span>⚠️</span>
             <span>{error}</span>
           </div>
@@ -100,25 +102,17 @@ export function Register() {
 
         <form onSubmit={handleSubmit} noValidate>
           {/* Role selector */}
-          <div className="form-group">
-            <label>I am a</label>
-            <div style={{ display: 'flex', gap: 12 }}>
+          <div className="mb-4">
+            <label className={labelClass}>I am a</label>
+            <div className="grid grid-cols-2 gap-3">
               {['patient', 'doctor'].map((r) => (
                 <label
                   key={r}
-                  style={{
-                    flex: 1,
-                    border: `2px solid ${form.role === r ? 'var(--primary)' : 'var(--border)'}`,
-                    borderRadius: 8,
-                    padding: '10px 16px',
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    fontWeight: 600,
-                    fontSize: 14,
-                    background: form.role === r ? '#eff6ff' : 'var(--card-bg)',
-                    color: form.role === r ? 'var(--primary)' : 'var(--text)',
-                    transition: 'all 0.15s'
-                  }}
+                  className={`flex items-center justify-center p-3 rounded-lg border-2 cursor-pointer text-center font-semibold text-sm transition ${
+                    form.role === r
+                      ? 'border-primary bg-blue-50 text-primary'
+                      : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                  }`}
                 >
                   <input
                     type="radio"
@@ -126,7 +120,7 @@ export function Register() {
                     value={r}
                     checked={form.role === r}
                     onChange={handleChange}
-                    style={{ display: 'none' }}
+                    className="sr-only"
                   />
                   {r === 'patient' ? '🧑‍⚕️ Patient' : '👨‍⚕️ Doctor'}
                 </label>
@@ -134,27 +128,27 @@ export function Register() {
             </div>
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="name">Full Name *</label>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label htmlFor="name" className={labelClass}>Full Name *</label>
               <input
                 id="name"
                 name="name"
                 type="text"
-                className="form-control"
+                className={inputClass}
                 placeholder="John Doe"
                 value={form.name}
                 onChange={handleChange}
                 required
               />
             </div>
-            <div className="form-group">
-              <label htmlFor="email">Email *</label>
+            <div>
+              <label htmlFor="email" className={labelClass}>Email *</label>
               <input
                 id="email"
                 name="email"
                 type="email"
-                className="form-control"
+                className={inputClass}
                 placeholder="you@example.com"
                 value={form.email}
                 onChange={handleChange}
@@ -163,13 +157,13 @@ export function Register() {
             </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">Password * (min 6 chars)</label>
+          <div className="mb-4">
+            <label htmlFor="password" className={labelClass}>Password * (min 6 chars)</label>
             <input
               id="password"
               name="password"
               type="password"
-              className="form-control"
+              className={inputClass}
               placeholder="••••••••"
               value={form.password}
               onChange={handleChange}
@@ -177,15 +171,14 @@ export function Register() {
             />
           </div>
 
-          {/* Doctor fields */}
           {form.role === 'doctor' && (
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="specialization">Specialization *</label>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label htmlFor="specialization" className={labelClass}>Specialization *</label>
                 <select
                   id="specialization"
                   name="specialization"
-                  className="form-control"
+                  className={inputClass}
                   value={form.specialization}
                   onChange={handleChange}
                   required
@@ -196,13 +189,13 @@ export function Register() {
                   ))}
                 </select>
               </div>
-              <div className="form-group">
-                <label htmlFor="experience">Experience (years)</label>
+              <div>
+                <label htmlFor="experience" className={labelClass}>Experience (years)</label>
                 <input
                   id="experience"
                   name="experience"
                   type="number"
-                  className="form-control"
+                  className={inputClass}
                   placeholder="e.g. 5"
                   min="0"
                   max="60"
@@ -213,16 +206,15 @@ export function Register() {
             </div>
           )}
 
-          {/* Patient fields */}
           {form.role === 'patient' && (
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="age">Age</label>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label htmlFor="age" className={labelClass}>Age</label>
                 <input
                   id="age"
                   name="age"
                   type="number"
-                  className="form-control"
+                  className={inputClass}
                   placeholder="e.g. 35"
                   min="1"
                   max="120"
@@ -230,12 +222,12 @@ export function Register() {
                   onChange={handleChange}
                 />
               </div>
-              <div className="form-group">
-                <label htmlFor="gender">Gender</label>
+              <div>
+                <label htmlFor="gender" className={labelClass}>Gender</label>
                 <select
                   id="gender"
                   name="gender"
-                  className="form-control"
+                  className={inputClass}
                   value={form.gender}
                   onChange={handleChange}
                 >
@@ -250,13 +242,12 @@ export function Register() {
 
           <button
             type="submit"
-            className="btn btn-primary btn-block btn-lg"
+            className="mt-2 w-full py-2.5 px-4 bg-primary hover:bg-primary-dark text-white font-semibold rounded-lg transition flex items-center justify-center gap-2 disabled:opacity-60"
             disabled={loading}
-            style={{ marginTop: '8px' }}
           >
             {loading ? (
               <>
-                <div className="spinner spinner-sm" />
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 Creating account…
               </>
             ) : (
@@ -265,8 +256,11 @@ export function Register() {
           </button>
         </form>
 
-        <div className="auth-footer">
-          Already have an account? <Link to="/login">Sign in</Link>
+        <div className="text-center text-sm text-gray-600 mt-6">
+          Already have an account?{' '}
+          <Link to="/login" className="text-primary hover:underline font-medium">
+            Sign in
+          </Link>
         </div>
       </div>
     </div>

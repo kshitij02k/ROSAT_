@@ -6,16 +6,26 @@ import NotificationBar from '../../components/NotificationBar';
 
 const EMERGENCY_LABELS = { 1: 'Mild', 2: 'Moderate', 3: 'Significant', 4: 'Severe', 5: 'Critical' };
 
+const badgeBase = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold';
+
 function emergencyBadgeClass(level) {
-  if (level <= 1) return 'badge-success';
-  if (level === 2) return 'badge-success';
-  if (level === 3) return 'badge-warning';
-  if (level === 4) return 'badge-danger';
-  return 'badge-danger';
+  if (level <= 2) return `${badgeBase} bg-green-100 text-green-700`;
+  if (level === 3) return `${badgeBase} bg-amber-100 text-amber-700`;
+  if (level === 4) return `${badgeBase} bg-orange-100 text-orange-700`;
+  return `${badgeBase} bg-red-100 text-red-700`;
 }
 
 function emergencyRowClass(level) {
-  return `emergency-${Math.min(level, 5)}`;
+  if (level <= 2) return 'bg-green-50';
+  if (level === 3) return 'bg-amber-50';
+  return 'bg-red-50';
+}
+
+function priorityBadgeClass(level) {
+  if (level <= 2) return `${badgeBase} bg-green-100 text-green-700`;
+  if (level === 3) return `${badgeBase} bg-amber-100 text-amber-700`;
+  if (level === 4) return `${badgeBase} bg-orange-100 text-orange-700`;
+  return `${badgeBase} bg-red-100 text-red-700`;
 }
 
 function formatElapsed(seconds) {
@@ -61,7 +71,6 @@ export function DoctorDashboard() {
     fetchDashboard();
   }, [fetchDashboard]);
 
-  // Real-time updates
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
@@ -69,7 +78,6 @@ export function DoctorDashboard() {
     return () => socket.off('queue:updated', fetchDashboard);
   }, [fetchDashboard]);
 
-  // Session timer
   useEffect(() => {
     if (currentPatient && currentPatient.status === 'in-progress') {
       timerRef.current = setInterval(() => setSessionElapsed((s) => s + 1), 1000);
@@ -122,19 +130,18 @@ export function DoctorDashboard() {
 
   if (loading) {
     return (
-      <div className="page-wrapper">
+      <div className="min-h-screen bg-gray-50 pt-16">
         <Navbar />
-        <div className="loading-full">
-          <div className="loading-spinner">
-            <div className="spinner" />
-            <span>Loading doctor dashboard…</span>
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-50">
+          <div className="flex flex-col items-center gap-3">
+            <div className="animate-spin h-8 w-8 rounded-full border-4 border-primary border-t-transparent" />
+            <span className="text-sm text-gray-500">Loading doctor dashboard…</span>
           </div>
         </div>
       </div>
     );
   }
 
-  // Sort queue by priority score descending
   const sortedQueue = [...queue].sort(
     (a, b) => (b.priorityScore ?? 0) - (a.priorityScore ?? 0)
   );
@@ -144,155 +151,159 @@ export function DoctorDashboard() {
   const isOvertime = remaining < 0 && currentPatient?.status === 'in-progress';
 
   return (
-    <div className="page-wrapper">
+    <div className="min-h-screen bg-gray-50 pt-16">
       <Navbar />
-      <div
-        style={{
-          paddingTop: 'var(--navbar-height)',
-          maxWidth: 1100,
-          margin: '0 auto',
-          padding: '80px 20px 60px'
-        }}
-      >
-        <div className="page-header">
-          <h1 className="page-title">👨‍⚕️ Doctor Dashboard</h1>
-          <p className="page-subtitle">Manage your queue and patient sessions.</p>
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">👨‍⚕️ Doctor Dashboard</h1>
+          <p className="text-gray-500 mt-1">Manage your queue and patient sessions.</p>
         </div>
 
         {error && (
-          <div className="alert alert-danger">
+          <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg flex items-center gap-2 text-sm mb-6">
             <span>⚠️</span> <span>{error}</span>
           </div>
         )}
 
-        {/* ─── Status Toggle ──────────────────────────────────────────── */}
-        <div className="status-toggle-section">
+        {/* Status Toggle */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6 flex items-center justify-between flex-wrap gap-4">
           <div>
-            <div
-              className={`status-toggle-label ${isOnline ? 'active' : 'inactive'}`}
-            >
+            <div className={`text-2xl font-black ${isOnline ? 'text-green-600' : 'text-red-500'}`}>
               {isOnline ? '🟢 ACTIVE' : '🔴 INACTIVE'}
             </div>
-            <div className="text-muted text-sm" style={{ marginTop: 4 }}>
+            <div className="text-sm text-gray-500 mt-1">
               {isOnline
                 ? 'You are accepting patients right now.'
                 : 'Toggle to start accepting patients.'}
             </div>
           </div>
 
-          <label className="toggle-switch" title="Toggle availability">
+          <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
               checked={isOnline}
               onChange={handleToggle}
               disabled={toggleLoading}
+              className="sr-only peer"
             />
-            <span className="toggle-slider" />
+            <div className="w-20 h-10 bg-red-400 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-10 after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-8 after:w-8 after:transition-all peer-checked:bg-green-500"></div>
           </label>
 
-          <div className="status-indicator">
-            <div className={`status-dot ${isOnline ? 'online' : 'offline'}`} />
-            <span>{isOnline ? 'Online & Available' : 'Offline'}</span>
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-3 h-3 rounded-full ${
+                isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+              }`}
+            />
+            <span className="text-sm text-gray-600">
+              {isOnline ? 'Online & Available' : 'Offline'}
+            </span>
           </div>
 
-          {toggleLoading && <div className="spinner spinner-sm" />}
+          {toggleLoading && (
+            <div className="animate-spin h-5 w-5 rounded-full border-2 border-primary border-t-transparent" />
+          )}
         </div>
 
-        {/* ─── Current Patient ────────────────────────────────────────── */}
-        <div className="card">
-          <div className="card-title">🧑‍⚕️ Current Patient</div>
+        {/* Current Patient */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">🧑‍⚕️ Current Patient</h2>
           {currentPatient ? (
             <div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-                  gap: 16,
-                  marginBottom: 20
-                }}
-              >
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-5">
                 <div>
-                  <div className="text-muted text-sm">Patient Name</div>
-                  <div className="fw-bold" style={{ fontSize: 18 }}>
+                  <div className="text-xs text-gray-500 mb-1">Patient Name</div>
+                  <div className="font-bold text-lg text-gray-900">
                     {currentPatient.name || currentPatient.patientName || '—'}
                   </div>
                 </div>
                 <div>
-                  <div className="text-muted text-sm">Emergency Level</div>
-                  <span
-                    className={`badge ${emergencyBadgeClass(currentPatient.emergencyLevel)}`}
-                  >
+                  <div className="text-xs text-gray-500 mb-1">Emergency Level</div>
+                  <span className={emergencyBadgeClass(currentPatient.emergencyLevel)}>
                     Level {currentPatient.emergencyLevel} –{' '}
                     {EMERGENCY_LABELS[currentPatient.emergencyLevel] || '—'}
                   </span>
                 </div>
                 <div>
-                  <div className="text-muted text-sm">Mode</div>
-                  <span className="badge badge-info">
+                  <div className="text-xs text-gray-500 mb-1">Mode</div>
+                  <span className={`${badgeBase} bg-blue-100 text-blue-700`}>
                     {currentPatient.consultationMode === 'video' ? '📹 Video' : '💬 Chat'}
                   </span>
                 </div>
                 <div>
-                  <div className="text-muted text-sm">Predicted Duration</div>
-                  <div className="fw-bold">{predicted} min</div>
+                  <div className="text-xs text-gray-500 mb-1">Predicted Duration</div>
+                  <div className="font-semibold text-sm text-gray-900">{predicted} min</div>
                 </div>
                 <div>
-                  <div className="text-muted text-sm">Status</div>
+                  <div className="text-xs text-gray-500 mb-1">Status</div>
                   <span
-                    className={`badge ${currentPatient.status === 'in-progress' ? 'badge-success' : 'badge-warning'}`}
+                    className={`${badgeBase} ${
+                      currentPatient.status === 'in-progress'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}
                   >
                     {currentPatient.status === 'in-progress' ? '🟢 In Progress' : '⏳ Waiting'}
                   </span>
                 </div>
                 {currentPatient.status === 'in-progress' && (
                   <div>
-                    <div className="text-muted text-sm">Session Timer</div>
+                    <div className="text-xs text-gray-500 mb-1">Session Timer</div>
                     <div
-                      className="fw-bold"
-                      style={{ fontSize: 22, color: isOvertime ? 'var(--danger)' : 'var(--text)', fontVariantNumeric: 'tabular-nums' }}
+                      className={`font-bold text-xl tabular-nums ${
+                        isOvertime ? 'text-red-500' : 'text-gray-900'
+                      }`}
                     >
                       {isOvertime ? '+' : ''}{formatElapsed(Math.abs(remaining))}
                     </div>
                     {isOvertime && (
-                      <div className="text-sm" style={{ color: 'var(--danger)' }}>Overtime!</div>
+                      <div className="text-xs text-red-500">Overtime!</div>
                     )}
                   </div>
                 )}
               </div>
 
-              <div className="form-group">
-                <div className="text-muted text-sm">Symptoms</div>
-                <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 14 }}>
+              <div className="mb-5">
+                <div className="text-xs text-gray-500 mb-1">Symptoms</div>
+                <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-800">
                   {currentPatient.symptoms || '—'}
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <div className="flex gap-3 flex-wrap">
                 {currentPatient.status !== 'in-progress' && (
                   <button
-                    className="btn btn-success"
+                    className="px-5 py-2.5 bg-success hover:bg-success/90 text-white font-semibold rounded-lg transition text-sm flex items-center gap-2 disabled:opacity-60"
                     onClick={handleStart}
                     disabled={actionLoading}
                   >
-                    {actionLoading ? <div className="spinner spinner-sm" /> : '▶️ Start Session'}
+                    {actionLoading ? (
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    ) : (
+                      '▶️ Start Session'
+                    )}
                   </button>
                 )}
                 {currentPatient.status === 'in-progress' && (
                   <button
-                    className="btn btn-danger"
+                    className="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition text-sm flex items-center gap-2 disabled:opacity-60"
                     onClick={handleEnd}
                     disabled={actionLoading}
                   >
-                    {actionLoading ? <div className="spinner spinner-sm" /> : '⏹ End Session'}
+                    {actionLoading ? (
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    ) : (
+                      '⏹ End Session'
+                    )}
                   </button>
                 )}
               </div>
             </div>
           ) : (
-            <div className="empty-state" style={{ padding: '20px 0' }}>
-              <div className="empty-state-icon" style={{ fontSize: 36 }}>🪑</div>
-              <div className="empty-state-title">No Current Patient</div>
-              <div className="empty-state-desc">
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-4xl mb-2">🪑</div>
+              <div className="font-semibold text-gray-700 mb-1">No Current Patient</div>
+              <div className="text-sm">
                 {isOnline
                   ? 'Waiting for next patient in the queue.'
                   : 'Set your status to Active to start receiving patients.'}
@@ -301,41 +312,34 @@ export function DoctorDashboard() {
           )}
         </div>
 
-        {/* ─── Queue Overview ─────────────────────────────────────────── */}
-        <div className="card">
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 16
-            }}
-          >
-            <div className="card-title" style={{ marginBottom: 0 }}>
-              📋 Queue Overview
-            </div>
-            <span className="badge badge-info">{sortedQueue.length} waiting</span>
+        {/* Queue Overview */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold text-gray-900">📋 Queue Overview</h2>
+            <span className={`${badgeBase} bg-blue-100 text-blue-700`}>
+              {sortedQueue.length} waiting
+            </span>
           </div>
 
           {sortedQueue.length === 0 ? (
-            <div className="empty-state" style={{ padding: '20px 0' }}>
-              <div className="empty-state-icon" style={{ fontSize: 32 }}>✅</div>
-              <div className="empty-state-title">Queue is Empty</div>
-              <div className="empty-state-desc">No patients waiting.</div>
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-3xl mb-2">✅</div>
+              <div className="font-semibold text-gray-700 mb-1">Queue is Empty</div>
+              <div className="text-sm">No patients waiting.</div>
             </div>
           ) : (
-            <div className="table-wrapper">
-              <table>
-                <thead>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
                   <tr>
-                    <th>#</th>
-                    <th>Patient</th>
-                    <th>Emergency</th>
-                    <th>Symptoms</th>
-                    <th>Est. Duration</th>
-                    <th>Priority Score</th>
-                    <th>Wait Time</th>
-                    <th>Mode</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">#</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Patient</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Emergency</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Symptoms</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Est. Duration</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Priority Score</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Wait Time</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Mode</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -344,37 +348,34 @@ export function DoctorDashboard() {
                       key={entry._id || entry.id || idx}
                       className={emergencyRowClass(entry.emergencyLevel)}
                     >
-                      <td style={{ fontWeight: 700 }}>{idx + 1}</td>
-                      <td style={{ fontWeight: 600 }}>
+                      <td className="px-4 py-3 border-t border-gray-100 font-bold">{idx + 1}</td>
+                      <td className="px-4 py-3 border-t border-gray-100 font-semibold">
                         {entry.name || entry.patientName || '—'}
                       </td>
-                      <td>
-                        <span className={`badge ${emergencyBadgeClass(entry.emergencyLevel)}`}>
+                      <td className="px-4 py-3 border-t border-gray-100">
+                        <span className={emergencyBadgeClass(entry.emergencyLevel)}>
                           {entry.emergencyLevel} – {EMERGENCY_LABELS[entry.emergencyLevel] || '—'}
                         </span>
                       </td>
                       <td
-                        style={{
-                          maxWidth: 180,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}
+                        className="px-4 py-3 border-t border-gray-100 max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap"
                         title={entry.symptoms}
                       >
                         {entry.symptoms || '—'}
                       </td>
-                      <td>{entry.predictedDuration != null ? `${entry.predictedDuration} min` : '—'}</td>
-                      <td>
-                        <div
-                          className={`priority-badge priority-${Math.min(entry.emergencyLevel || 1, 5)}`}
-                        >
-                          {entry.priorityScore != null ? entry.priorityScore.toFixed(1) : '—'}
-                        </div>
+                      <td className="px-4 py-3 border-t border-gray-100">
+                        {entry.predictedDuration != null ? `${entry.predictedDuration} min` : '—'}
                       </td>
-                      <td>{entry.waitTime != null ? `${entry.waitTime} min` : '—'}</td>
-                      <td>
-                        <span className="badge badge-info">
+                      <td className="px-4 py-3 border-t border-gray-100">
+                        <span className={priorityBadgeClass(entry.emergencyLevel || 1)}>
+                          {entry.priorityScore != null ? entry.priorityScore.toFixed(1) : '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 border-t border-gray-100">
+                        {entry.waitTime != null ? `${entry.waitTime} min` : '—'}
+                      </td>
+                      <td className="px-4 py-3 border-t border-gray-100">
+                        <span className={`${badgeBase} bg-blue-100 text-blue-700`}>
                           {entry.consultationMode === 'video' ? '📹' : '💬'}
                         </span>
                       </td>

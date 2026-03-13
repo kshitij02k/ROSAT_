@@ -15,22 +15,33 @@ const EMERGENCY_LABELS = {
 
 const STEPS = ['Patient Info', 'Medical Details', 'Doctor Selection', 'Confirm'];
 
+const inputClass =
+  'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition';
+const labelClass = 'block text-sm font-medium text-gray-700 mb-1';
+
 function EmergencyWarningModal({ level, onConfirm, onChange }) {
   return (
-    <div className="modal-overlay">
-      <div className="modal emergency-modal">
-        <div className="modal-title">⚠️ High Emergency Warning</div>
-        <div className="modal-body">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full">
+        <div className="text-4xl mb-3 text-center">⚠️</div>
+        <h2 className="text-xl font-bold text-red-600 text-center">High Emergency Warning</h2>
+        <p className="text-gray-700 text-sm mt-2 text-center">
           You selected <strong>Level {level} – {EMERGENCY_LABELS[level]}</strong>.{' '}
           Selecting a high emergency level is reserved for <strong>genuinely severe cases</strong>.
           Misuse may result in a <strong>fine or queue penalty</strong>.
           Please confirm only if your condition truly warrants urgent attention.
-        </div>
-        <div className="modal-actions">
-          <button className="btn btn-outline" onClick={onChange}>
+        </p>
+        <div className="flex gap-3 mt-6 justify-end">
+          <button
+            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium"
+            onClick={onChange}
+          >
             ← Change Level
           </button>
-          <button className="btn btn-danger" onClick={onConfirm}>
+          <button
+            className="px-4 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg transition font-semibold"
+            onClick={onConfirm}
+          >
             I Understand – Proceed
           </button>
         </div>
@@ -48,7 +59,6 @@ export function JoinQueue() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
 
-  // Step 1 – Patient Info
   const [patientInfo, setPatientInfo] = useState({
     name: user?.name || '',
     age: user?.age || '',
@@ -57,7 +67,6 @@ export function JoinQueue() {
     previousVisitCount: ''
   });
 
-  // Step 2 – Medical Details
   const [medical, setMedical] = useState({
     symptoms: '',
     emergencyLevel: 1,
@@ -66,13 +75,11 @@ export function JoinQueue() {
   const [showWarning, setShowWarning] = useState(false);
   const [pendingLevel, setPendingLevel] = useState(null);
 
-  // Step 3 – Doctor
   const [mlSpec, setMlSpec] = useState('');
   const [mlLoading, setMlLoading] = useState(false);
   const [doctors, setDoctors] = useState([]);
   const [selectedDoctor, setSelectedDoctor] = useState('auto');
 
-  // ─── Step navigation ───────────────────────────────────────────────────────
   const nextStep = () => {
     setError('');
     if (step === 0) {
@@ -92,7 +99,6 @@ export function JoinQueue() {
       }
     }
     if (step === 1) {
-      // Fetch ML prediction when advancing to step 2
       fetchMlPrediction();
     }
     setStep((s) => s + 1);
@@ -103,7 +109,6 @@ export function JoinQueue() {
     setStep((s) => s - 1);
   };
 
-  // ─── ML Prediction ────────────────────────────────────────────────────────
   const fetchMlPrediction = async () => {
     setMlLoading(true);
     setMlSpec('');
@@ -120,7 +125,6 @@ export function JoinQueue() {
     }
   };
 
-  // ─── Emergency level selection ────────────────────────────────────────────
   const handleEmergencySelect = (level) => {
     if (level >= 4) {
       setPendingLevel(level);
@@ -141,7 +145,6 @@ export function JoinQueue() {
     setPendingLevel(null);
   };
 
-  // ─── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     setLoading(true);
     setError('');
@@ -162,7 +165,7 @@ export function JoinQueue() {
       };
       const res = await patientApi.joinQueue(payload);
       setSuccess(res.data);
-      setStep(4); // success screen
+      setStep(4);
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -174,40 +177,72 @@ export function JoinQueue() {
     }
   };
 
-  // ─── Render helpers ───────────────────────────────────────────────────────
+  function getEmergencyButtonClass(level) {
+    const isSelected = medical.emergencyLevel === level;
+    if (level <= 2) {
+      return isSelected
+        ? 'border-green-500 bg-green-50 text-green-700'
+        : 'border-gray-200 hover:border-green-400 text-gray-700';
+    }
+    if (level === 3) {
+      return isSelected
+        ? 'border-amber-500 bg-amber-50 text-amber-700'
+        : 'border-gray-200 hover:border-amber-400 text-gray-700';
+    }
+    return isSelected
+      ? 'border-red-500 bg-red-50 text-red-700'
+      : 'border-gray-200 hover:border-red-400 text-gray-700';
+  }
+
   const renderStepper = () => (
-    <div className="stepper">
+    <div className="flex items-center justify-between mb-8">
       {STEPS.map((label, idx) => (
-        <div
-          key={label}
-          className={`step ${idx < step ? 'completed' : ''} ${idx === step ? 'active' : ''}`}
-        >
-          <div className="step-circle">
-            {idx < step ? '✓' : idx + 1}
+        <React.Fragment key={label}>
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                idx < step
+                  ? 'bg-green-500 text-white'
+                  : idx === step
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-200 text-gray-500'
+              }`}
+            >
+              {idx < step ? '✓' : idx + 1}
+            </div>
+            <span
+              className={`text-sm font-medium hidden sm:block ${
+                idx === step ? 'text-primary' : 'text-gray-400'
+              }`}
+            >
+              {label}
+            </span>
           </div>
-          <span className="step-label">{label}</span>
-        </div>
+          {idx < STEPS.length - 1 && (
+            <div className={`flex-1 h-0.5 mx-2 ${idx < step ? 'bg-green-500' : 'bg-gray-200'}`} />
+          )}
+        </React.Fragment>
       ))}
     </div>
   );
 
   const renderStep0 = () => (
     <div>
-      <h2 className="card-title">👤 Patient Information</h2>
-      <div className="form-row">
-        <div className="form-group">
-          <label>Full Name *</label>
+      <h2 className="text-base font-semibold text-gray-900 mb-4">👤 Patient Information</h2>
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <label className={labelClass}>Full Name *</label>
           <input
-            className="form-control"
+            className={inputClass}
             value={patientInfo.name}
             onChange={(e) => setPatientInfo((p) => ({ ...p, name: e.target.value }))}
             placeholder="Your full name"
           />
         </div>
-        <div className="form-group">
-          <label>Age *</label>
+        <div>
+          <label className={labelClass}>Age *</label>
           <input
-            className="form-control"
+            className={inputClass}
             type="number"
             min="1"
             max="120"
@@ -217,11 +252,11 @@ export function JoinQueue() {
           />
         </div>
       </div>
-      <div className="form-row">
-        <div className="form-group">
-          <label>Gender *</label>
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <label className={labelClass}>Gender *</label>
           <select
-            className="form-control"
+            className={inputClass}
             value={patientInfo.gender}
             onChange={(e) => setPatientInfo((p) => ({ ...p, gender: e.target.value }))}
           >
@@ -231,10 +266,10 @@ export function JoinQueue() {
             ))}
           </select>
         </div>
-        <div className="form-group">
-          <label>Visit Type *</label>
+        <div>
+          <label className={labelClass}>Visit Type *</label>
           <select
-            className="form-control"
+            className={inputClass}
             value={patientInfo.visitType}
             onChange={(e) => setPatientInfo((p) => ({ ...p, visitType: e.target.value }))}
           >
@@ -244,10 +279,10 @@ export function JoinQueue() {
         </div>
       </div>
       {patientInfo.visitType === 'Follow-up' && (
-        <div className="form-group">
-          <label>Previous Visit Count *</label>
+        <div className="mb-4">
+          <label className={labelClass}>Previous Visit Count *</label>
           <input
-            className="form-control"
+            className={inputClass}
             type="number"
             min="1"
             value={patientInfo.previousVisitCount}
@@ -263,11 +298,11 @@ export function JoinQueue() {
 
   const renderStep1 = () => (
     <div>
-      <h2 className="card-title">🩺 Medical Details</h2>
-      <div className="form-group">
-        <label>Symptoms / Chief Complaint *</label>
+      <h2 className="text-base font-semibold text-gray-900 mb-4">🩺 Medical Details</h2>
+      <div className="mb-4">
+        <label className={labelClass}>Symptoms / Chief Complaint *</label>
         <textarea
-          className="form-control"
+          className={inputClass}
           rows={4}
           value={medical.symptoms}
           onChange={(e) => setMedical((m) => ({ ...m, symptoms: e.target.value }))}
@@ -275,45 +310,52 @@ export function JoinQueue() {
         />
       </div>
 
-      <div className="form-group">
-        <label>Emergency Level *</label>
-        <div className="emergency-levels">
+      <div className="mb-4">
+        <label className={labelClass}>Emergency Level *</label>
+        <div className="grid grid-cols-5 gap-2 mb-2">
           {[1, 2, 3, 4, 5].map((level) => (
             <button
               key={level}
               type="button"
-              className={`emergency-btn ${medical.emergencyLevel === level ? 'selected' : ''}`}
-              data-level={level}
+              className={`p-3 rounded-xl border-2 text-center cursor-pointer transition ${getEmergencyButtonClass(level)}`}
               onClick={() => handleEmergencySelect(level)}
             >
-              <div style={{ fontSize: 18 }}>{level}</div>
-              <div style={{ fontSize: 11, marginTop: 2 }}>{EMERGENCY_LABELS[level]}</div>
+              <div className="text-lg font-bold">{level}</div>
+              <div className="text-xs mt-0.5">{EMERGENCY_LABELS[level]}</div>
             </button>
           ))}
         </div>
-        <div className="emergency-level-desc">
+        <p className="text-sm text-gray-600">
           Selected: <strong>Level {medical.emergencyLevel} – {EMERGENCY_LABELS[medical.emergencyLevel]}</strong>
-        </div>
+        </p>
       </div>
 
-      <div className="form-group">
-        <label>Consultation Mode *</label>
-        <div className="mode-cards">
+      <div className="mb-4">
+        <label className={labelClass}>Consultation Mode *</label>
+        <div className="grid grid-cols-2 gap-4">
           <div
-            className={`mode-card ${medical.consultationMode === 'video' ? 'selected' : ''}`}
+            className={`p-6 rounded-xl border-2 cursor-pointer text-center hover:border-primary transition ${
+              medical.consultationMode === 'video'
+                ? 'border-primary bg-blue-50'
+                : 'border-gray-200'
+            }`}
             onClick={() => setMedical((m) => ({ ...m, consultationMode: 'video' }))}
           >
-            <div className="mode-card-icon">📹</div>
-            <div className="mode-card-title">Video Call</div>
-            <div className="mode-card-desc">Face-to-face consultation</div>
+            <div className="text-3xl mb-2">📹</div>
+            <div className="font-semibold text-sm text-gray-800">Video Call</div>
+            <div className="text-xs text-gray-500 mt-1">Face-to-face consultation</div>
           </div>
           <div
-            className={`mode-card ${medical.consultationMode === 'chat' ? 'selected' : ''}`}
+            className={`p-6 rounded-xl border-2 cursor-pointer text-center hover:border-primary transition ${
+              medical.consultationMode === 'chat'
+                ? 'border-primary bg-blue-50'
+                : 'border-gray-200'
+            }`}
             onClick={() => setMedical((m) => ({ ...m, consultationMode: 'chat' }))}
           >
-            <div className="mode-card-icon">💬</div>
-            <div className="mode-card-title">Chat</div>
-            <div className="mode-card-desc">Text-based consultation</div>
+            <div className="text-3xl mb-2">💬</div>
+            <div className="font-semibold text-sm text-gray-800">Chat</div>
+            <div className="text-xs text-gray-500 mt-1">Text-based consultation</div>
           </div>
         </div>
       </div>
@@ -322,16 +364,16 @@ export function JoinQueue() {
 
   const renderStep2 = () => (
     <div>
-      <h2 className="card-title">👨‍⚕️ Doctor Selection</h2>
+      <h2 className="text-base font-semibold text-gray-900 mb-4">👨‍⚕️ Doctor Selection</h2>
 
       {mlLoading ? (
-        <div className="loading-spinner">
-          <div className="spinner" />
-          <span>Analyzing symptoms with ML…</span>
+        <div className="flex items-center gap-3 py-6 justify-center">
+          <div className="animate-spin h-5 w-5 rounded-full border-2 border-primary border-t-transparent" />
+          <span className="text-sm text-gray-600">Analyzing symptoms with ML…</span>
         </div>
       ) : (
         <>
-          <div className="alert alert-info" style={{ marginBottom: 20 }}>
+          <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-lg flex items-center gap-2 text-sm mb-5">
             <span>🤖</span>
             <span>
               <strong>ML Recommendation:</strong> Based on your symptoms, we suggest a{' '}
@@ -339,42 +381,50 @@ export function JoinQueue() {
             </span>
           </div>
 
-          <div className="form-group">
-            <label>Assignment Method</label>
+          <div className="mb-4">
+            <label className={labelClass}>Assignment Method</label>
             <div
-              className={`doctor-card ${selectedDoctor === 'auto' ? 'selected' : ''}`}
+              className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer hover:border-primary transition mb-3 ${
+                selectedDoctor === 'auto' ? 'border-primary bg-blue-50' : 'border-gray-200'
+              }`}
               onClick={() => setSelectedDoctor('auto')}
             >
-              <div className="doctor-avatar">🤖</div>
-              <div className="doctor-info">
-                <div className="doctor-name">Auto-Assign</div>
-                <div className="doctor-spec">Best available {mlSpec} doctor</div>
+              <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-xl">��</div>
+              <div className="flex-1">
+                <div className="font-semibold text-sm text-gray-900">Auto-Assign</div>
+                <div className="text-xs text-gray-500">Best available {mlSpec} doctor</div>
               </div>
-              {selectedDoctor === 'auto' && <span className="badge badge-success">Selected</span>}
+              {selectedDoctor === 'auto' && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                  Selected
+                </span>
+              )}
             </div>
           </div>
 
           {doctors.length > 0 && (
-            <div className="form-group">
-              <label>Or choose a specific doctor</label>
+            <div className="mb-4">
+              <label className={labelClass}>Or choose a specific doctor</label>
               {doctors.map((doc) => (
                 <div
                   key={doc._id || doc.id}
-                  className={`doctor-card ${selectedDoctor === (doc._id || doc.id) ? 'selected' : ''}`}
+                  className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer hover:border-primary transition mb-3 ${
+                    selectedDoctor === (doc._id || doc.id) ? 'border-primary bg-blue-50' : 'border-gray-200'
+                  }`}
                   onClick={() => setSelectedDoctor(doc._id || doc.id)}
                 >
-                  <div className="doctor-avatar">
+                  <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
                     {doc.name?.charAt(0).toUpperCase() || 'D'}
                   </div>
-                  <div className="doctor-info">
-                    <div className="doctor-name">Dr. {doc.name}</div>
-                    <div className="doctor-spec">{doc.specialization}</div>
+                  <div className="flex-1">
+                    <div className="font-semibold text-sm text-gray-900">Dr. {doc.name}</div>
+                    <div className="text-xs text-gray-500">{doc.specialization}</div>
                   </div>
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', flexShrink: 0 }}>
-                    Queue: {doc.queueLength ?? 0}
-                  </div>
+                  <div className="text-xs text-gray-500">Queue: {doc.queueLength ?? 0}</div>
                   {selectedDoctor === (doc._id || doc.id) && (
-                    <span className="badge badge-success">Selected</span>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                      Selected
+                    </span>
                   )}
                 </div>
               ))}
@@ -382,7 +432,7 @@ export function JoinQueue() {
           )}
 
           {doctors.length === 0 && (
-            <div className="alert alert-warning">
+            <div className="bg-amber-50 border border-amber-200 text-amber-700 p-3 rounded-lg flex items-center gap-2 text-sm">
               <span>ℹ️</span>
               <span>No active doctors available. Auto-assign will find the best option.</span>
             </div>
@@ -394,52 +444,52 @@ export function JoinQueue() {
 
   const renderStep3 = () => (
     <div>
-      <h2 className="card-title">✅ Confirm Queue Entry</h2>
-      <div
-        style={{
-          background: '#f8fafc',
-          border: '1px solid var(--border)',
-          borderRadius: 10,
-          padding: 20,
-          marginBottom: 20
-        }}
-      >
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px' }}>
+      <h2 className="text-base font-semibold text-gray-900 mb-4">✅ Confirm Queue Entry</h2>
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 mb-5">
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <div className="text-muted text-sm">Patient</div>
-            <div className="fw-bold">{patientInfo.name}</div>
+            <div className="text-xs text-gray-500">Patient</div>
+            <div className="font-semibold text-sm text-gray-900">{patientInfo.name}</div>
           </div>
           <div>
-            <div className="text-muted text-sm">Age / Gender</div>
-            <div className="fw-bold">{patientInfo.age} / {patientInfo.gender}</div>
+            <div className="text-xs text-gray-500">Age / Gender</div>
+            <div className="font-semibold text-sm text-gray-900">{patientInfo.age} / {patientInfo.gender}</div>
           </div>
           <div>
-            <div className="text-muted text-sm">Visit Type</div>
-            <div className="fw-bold">{patientInfo.visitType}</div>
+            <div className="text-xs text-gray-500">Visit Type</div>
+            <div className="font-semibold text-sm text-gray-900">{patientInfo.visitType}</div>
           </div>
           <div>
-            <div className="text-muted text-sm">Consultation Mode</div>
-            <div className="fw-bold">{medical.consultationMode === 'video' ? '📹 Video' : '💬 Chat'}</div>
+            <div className="text-xs text-gray-500">Consultation Mode</div>
+            <div className="font-semibold text-sm text-gray-900">
+              {medical.consultationMode === 'video' ? '📹 Video' : '💬 Chat'}
+            </div>
           </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <div className="text-muted text-sm">Symptoms</div>
-            <div className="fw-bold">{medical.symptoms}</div>
+          <div className="col-span-2">
+            <div className="text-xs text-gray-500">Symptoms</div>
+            <div className="font-semibold text-sm text-gray-900">{medical.symptoms}</div>
           </div>
           <div>
-            <div className="text-muted text-sm">Emergency Level</div>
+            <div className="text-xs text-gray-500">Emergency Level</div>
             <span
-              className={`badge ${medical.emergencyLevel <= 2 ? 'badge-success' : medical.emergencyLevel === 3 ? 'badge-warning' : 'badge-danger'}`}
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                medical.emergencyLevel <= 2
+                  ? 'bg-green-100 text-green-700'
+                  : medical.emergencyLevel === 3
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-red-100 text-red-700'
+              }`}
             >
               Level {medical.emergencyLevel} – {EMERGENCY_LABELS[medical.emergencyLevel]}
             </span>
           </div>
           <div>
-            <div className="text-muted text-sm">Specialization</div>
-            <div className="fw-bold">{mlSpec || 'Auto-detect'}</div>
+            <div className="text-xs text-gray-500">Specialization</div>
+            <div className="font-semibold text-sm text-gray-900">{mlSpec || 'Auto-detect'}</div>
           </div>
           <div>
-            <div className="text-muted text-sm">Doctor</div>
-            <div className="fw-bold">
+            <div className="text-xs text-gray-500">Doctor</div>
+            <div className="font-semibold text-sm text-gray-900">
               {selectedDoctor === 'auto'
                 ? '🤖 Auto-Assign'
                 : doctors.find((d) => (d._id || d.id) === selectedDoctor)?.name
@@ -454,33 +504,33 @@ export function JoinQueue() {
 
   const renderSuccess = () => (
     <div>
-      <div className="success-banner">
-        <div className="success-icon">🎉</div>
-        <div className="success-title">You're in the Queue!</div>
-        <div className="success-subtitle">Your request has been submitted successfully.</div>
+      <div className="text-center py-8">
+        <div className="text-5xl mb-3">🎉</div>
+        <div className="text-2xl font-bold text-gray-900">You're in the Queue!</div>
+        <div className="text-gray-500 text-sm mt-1">Your request has been submitted successfully.</div>
       </div>
-      <div className="queue-status-card">
-        <div className="queue-position">#{success?.position ?? '—'}</div>
-        <div className="queue-position-label">Your position in queue</div>
-        <div className="queue-info-grid">
-          <div className="queue-info-item">
-            <div className="queue-info-item-value">{success?.patientsAhead ?? 0}</div>
-            <div className="queue-info-item-label">Patients Ahead</div>
+      <div className="bg-gradient-to-br from-primary to-primary-dark text-white rounded-2xl p-6 mb-6">
+        <div className="text-6xl font-black text-center">#{success?.position ?? '—'}</div>
+        <div className="text-center text-sm opacity-75 mt-1">Your position in queue</div>
+        <div className="grid grid-cols-3 gap-4 mt-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold">{success?.patientsAhead ?? 0}</div>
+            <div className="text-sm opacity-75">Patients Ahead</div>
           </div>
-          <div className="queue-info-item">
-            <div className="queue-info-item-value">{success?.estimatedWait ?? '—'} min</div>
-            <div className="queue-info-item-label">Est. Wait Time</div>
+          <div className="text-center">
+            <div className="text-2xl font-bold">{success?.estimatedWait ?? '—'} min</div>
+            <div className="text-sm opacity-75">Est. Wait Time</div>
           </div>
-          <div className="queue-info-item">
-            <div className="queue-info-item-value">
+          <div className="text-center">
+            <div className="text-lg font-bold">
               {success?.doctorName ? `Dr. ${success.doctorName}` : '—'}
             </div>
-            <div className="queue-info-item-label">Assigned Doctor</div>
+            <div className="text-sm opacity-75">Assigned Doctor</div>
           </div>
         </div>
       </div>
       <button
-        className="btn btn-primary btn-block"
+        className="w-full py-2.5 px-4 bg-primary hover:bg-primary-dark text-white font-semibold rounded-lg transition"
         onClick={() => navigate('/patient/dashboard')}
       >
         Go to Dashboard
@@ -489,19 +539,19 @@ export function JoinQueue() {
   );
 
   return (
-    <div className="page-wrapper">
+    <div className="min-h-screen bg-gray-50 pt-16">
       <Navbar />
-      <div style={{ paddingTop: 'var(--navbar-height)', maxWidth: 660, margin: '0 auto', padding: '80px 20px 60px' }}>
-        <div className="page-header">
-          <h1 className="page-title">📋 Join Live Queue</h1>
-          <p className="page-subtitle">Fill in your details to get in the virtual queue.</p>
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">📋 Join Live Queue</h1>
+          <p className="text-gray-500 mt-1">Fill in your details to get in the virtual queue.</p>
         </div>
 
-        <div className="card">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           {step < 4 && renderStepper()}
 
           {error && (
-            <div className="alert alert-danger">
+            <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg flex items-center gap-2 text-sm mb-4">
               <span>⚠️</span>
               <span>{error}</span>
             </div>
@@ -514,16 +564,12 @@ export function JoinQueue() {
           {step === 4 && renderSuccess()}
 
           {step < 4 && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                marginTop: 24,
-                gap: 12
-              }}
-            >
+            <div className="flex justify-between mt-6 gap-3">
               {step > 0 ? (
-                <button className="btn btn-outline" onClick={prevStep}>
+                <button
+                  className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium"
+                  onClick={prevStep}
+                >
                   ← Back
                 </button>
               ) : (
@@ -532,7 +578,7 @@ export function JoinQueue() {
 
               {step < 3 ? (
                 <button
-                  className="btn btn-primary"
+                  className="px-5 py-2 text-sm bg-primary hover:bg-primary-dark text-white font-semibold rounded-lg transition disabled:opacity-60"
                   onClick={nextStep}
                   disabled={mlLoading}
                 >
@@ -540,13 +586,13 @@ export function JoinQueue() {
                 </button>
               ) : (
                 <button
-                  className="btn btn-success"
+                  className="px-5 py-2 text-sm bg-success hover:bg-success/90 text-white font-semibold rounded-lg transition disabled:opacity-60 flex items-center gap-2"
                   onClick={handleSubmit}
                   disabled={loading}
                 >
                   {loading ? (
                     <>
-                      <div className="spinner spinner-sm" />
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                       Submitting…
                     </>
                   ) : (

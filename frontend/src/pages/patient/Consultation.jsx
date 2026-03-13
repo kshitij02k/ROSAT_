@@ -14,39 +14,34 @@ function formatTime(seconds) {
 
 function VideoCall({ onToggleMic, onToggleCam, micOn, camOn, doctorName }) {
   return (
-    <div className="video-call-container">
-      <div className="video-main">
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 56, marginBottom: 8 }}>👨‍⚕️</div>
-          <div style={{ color: '#94a3b8', fontSize: 14 }}>
-            Dr. {doctorName || 'Doctor'}
-          </div>
-          <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
-            Video connected
-          </div>
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+      <div className="bg-gray-900 rounded-2xl aspect-video relative flex items-center justify-center mb-4">
+        <div className="text-center">
+          <div className="text-5xl mb-2">👨‍⚕️</div>
+          <div className="text-slate-400 text-sm">Dr. {doctorName || 'Doctor'}</div>
+          <div className="text-slate-500 text-xs mt-1">Video connected</div>
         </div>
-        <div className="video-self">
-          <span style={{ fontSize: 20 }}>🧑</span>
+        <div className="absolute bottom-3 right-3 w-16 h-16 bg-gray-700 rounded-xl flex items-center justify-center">
+          <span className="text-xl">🧑</span>
         </div>
       </div>
-      <div className="video-controls">
+      <div className="flex justify-center gap-3">
         <button
-          className={`video-btn ${micOn ? 'on' : 'off'}`}
+          className={`p-3 rounded-full text-2xl ${micOn ? 'bg-gray-700 text-white' : 'bg-red-600 text-white'}`}
           onClick={onToggleMic}
           title={micOn ? 'Mute microphone' : 'Unmute microphone'}
         >
           {micOn ? '🎙️' : '🔇'}
         </button>
         <button
-          className={`video-btn ${camOn ? 'on' : 'off'}`}
+          className={`p-3 rounded-full text-2xl ${camOn ? 'bg-gray-700 text-white' : 'bg-red-600 text-white'}`}
           onClick={onToggleCam}
           title={camOn ? 'Turn off camera' : 'Turn on camera'}
         >
           {camOn ? '📹' : '📷'}
         </button>
         <button
-          className="video-btn"
-          style={{ background: '#334155' }}
+          className="p-3 rounded-full text-2xl bg-slate-600 text-white"
           title="Screen share"
         >
           🖥️
@@ -78,41 +73,48 @@ function ChatInterface({ messages, onSend, doctorName }) {
   };
 
   return (
-    <div className="chat-container">
-      <div
-        style={{
-          padding: '10px 14px',
-          background: 'var(--primary)',
-          color: '#fff',
-          fontSize: 14,
-          fontWeight: 600
-        }}
-      >
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+      <div className="px-4 py-3 bg-primary text-white text-sm font-semibold">
         💬 Chat with Dr. {doctorName || 'Doctor'}
       </div>
-      <div className="chat-messages">
+      <div className="h-72 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 && (
-          <div className="text-center text-muted" style={{ padding: '20px 0', fontSize: 14 }}>
+          <div className="text-center text-gray-400 text-sm py-4">
             Chat session started. Say hello!
           </div>
         )}
         {messages.map((msg, i) => (
-          <div key={i} className={`chat-message ${msg.sender === 'patient' ? 'sent' : 'received'}`}>
-            <div>{msg.text}</div>
-            <div className="chat-message-time">{msg.time}</div>
+          <div key={i} className={`flex ${msg.sender === 'patient' ? 'justify-end' : 'justify-start'}`}>
+            <div className="flex flex-col gap-0.5 max-w-xs">
+              <div
+                className={`px-4 py-2 text-sm ${
+                  msg.sender === 'patient'
+                    ? 'bg-primary text-white rounded-2xl rounded-br-none ml-auto'
+                    : 'bg-gray-100 text-gray-800 rounded-2xl rounded-bl-none'
+                }`}
+              >
+                {msg.text}
+              </div>
+              <div className={`text-xs text-gray-400 ${msg.sender === 'patient' ? 'text-right' : ''}`}>
+                {msg.time}
+              </div>
+            </div>
           </div>
         ))}
         <div ref={bottomRef} />
       </div>
-      <div className="chat-input-bar">
+      <div className="flex gap-2 p-3 border-t border-gray-100">
         <input
-          className="chat-input"
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKey}
           placeholder="Type a message…"
         />
-        <button className="btn btn-primary btn-sm" onClick={send}>
+        <button
+          className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition"
+          onClick={send}
+        >
           Send
         </button>
       </div>
@@ -132,7 +134,7 @@ export function Consultation() {
   const [messages, setMessages] = useState([
     {
       sender: 'doctor',
-      text: 'Hello! I\'m ready to see you. How can I help you today?',
+      text: "Hello! I'm ready to see you. How can I help you today?",
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -142,11 +144,7 @@ export function Consultation() {
       try {
         const res = await patientApi.getMyQueue();
         const data = res.data;
-        if (data && (data._id === id || data.id === id || !id)) {
-          setConsultation(data);
-        } else {
-          setConsultation(data);
-        }
+        setConsultation(data);
       } catch {
         setConsultation(null);
       } finally {
@@ -156,13 +154,11 @@ export function Consultation() {
     load();
   }, [id]);
 
-  // Timer
   useEffect(() => {
     const interval = setInterval(() => setElapsed((s) => s + 1), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Socket for chat messages
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
@@ -200,12 +196,12 @@ export function Consultation() {
 
   if (loading) {
     return (
-      <div className="page-wrapper">
+      <div className="min-h-screen bg-gray-50 pt-16">
         <Navbar />
-        <div className="loading-full">
-          <div className="loading-spinner">
-            <div className="spinner" />
-            <span>Loading consultation…</span>
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-50">
+          <div className="flex flex-col items-center gap-3">
+            <div className="animate-spin h-8 w-8 rounded-full border-4 border-primary border-t-transparent" />
+            <span className="text-sm text-gray-500">Loading consultation…</span>
           </div>
         </div>
       </div>
@@ -219,21 +215,14 @@ export function Consultation() {
   const doctorName = consultation?.doctorName || consultation?.doctor?.name || 'Doctor';
 
   return (
-    <div className="page-wrapper">
+    <div className="min-h-screen bg-gray-50 pt-16">
       <Navbar />
-      <div
-        style={{
-          paddingTop: 'var(--navbar-height)',
-          maxWidth: 800,
-          margin: '0 auto',
-          padding: '80px 20px 60px'
-        }}
-      >
-        <div className="page-header">
-          <h1 className="page-title">
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">
             {mode === 'video' ? '📹' : '💬'} Consultation in Progress
           </h1>
-          <p className="page-subtitle">
+          <p className="text-gray-500 mt-1">
             {isOvertime
               ? '⚠️ Session has exceeded predicted duration'
               : `Predicted duration: ${predicted} minutes`}
@@ -241,16 +230,14 @@ export function Consultation() {
         </div>
 
         {/* Timer */}
-        <div className="consultation-timer">
-          <div className={`timer-display ${isOvertime ? 'overtime' : ''}`}>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6 text-center">
+          <div className={`text-6xl font-black tabular-nums ${isOvertime ? 'text-red-500' : 'text-gray-800'}`}>
             {isOvertime ? '+' : ''}{formatTime(Math.abs(remaining))}
           </div>
-          <div className="timer-label">
-            {isOvertime
-              ? 'Overtime — session extended'
-              : 'Remaining time'}
+          <div className="text-sm text-gray-500 mt-2">
+            {isOvertime ? 'Overtime — session extended' : 'Remaining time'}
           </div>
-          <div style={{ marginTop: 12, display: 'flex', gap: 24, justifyContent: 'center', fontSize: 13, opacity: 0.7 }}>
+          <div className="flex gap-6 justify-center text-xs text-gray-400 mt-3">
             <span>Elapsed: {formatTime(elapsed)}</span>
             <span>•</span>
             <span>Mode: {mode === 'video' ? '📹 Video' : '💬 Chat'}</span>
@@ -258,26 +245,25 @@ export function Consultation() {
         </div>
 
         {/* Patient + Doctor info */}
-        <div className="card">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+          <div className="grid grid-cols-2 gap-5">
             <div>
-              <div className="card-subtitle">Patient</div>
-              <div className="fw-bold">{consultation?.name || consultation?.patientName || '—'}</div>
-              <div className="text-muted text-sm mt-8">
-                {consultation?.symptoms || '—'}
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Patient</div>
+              <div className="font-semibold text-gray-900">
+                {consultation?.name || consultation?.patientName || '—'}
               </div>
+              <div className="text-sm text-gray-500 mt-1">{consultation?.symptoms || '—'}</div>
             </div>
             <div>
-              <div className="card-subtitle">Doctor</div>
-              <div className="fw-bold">Dr. {doctorName}</div>
-              <div className="text-muted text-sm mt-8">
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Doctor</div>
+              <div className="font-semibold text-gray-900">Dr. {doctorName}</div>
+              <div className="text-sm text-gray-500 mt-1">
                 {consultation?.doctorSpecialization || consultation?.doctor?.specialization || '—'}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Main consultation UI */}
         {mode === 'video' ? (
           <VideoCall
             doctorName={doctorName}
@@ -294,7 +280,7 @@ export function Consultation() {
           />
         )}
 
-        <div className="alert alert-info">
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 p-3 rounded-lg flex items-center gap-2 text-sm">
           <span>ℹ️</span>
           <span>
             The doctor will end the session when the consultation is complete.
