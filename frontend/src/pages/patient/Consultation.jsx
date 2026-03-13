@@ -283,15 +283,17 @@ export function Consultation() {
 
   const handleSend = (text) => {
     const socket = getSocket();
+    const recipientId = consultation?.doctorId || consultation?.doctor?._id;
+    if (!socket || !recipientId) return;
     const msg = {
       sender: 'patient',
       text,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     setMessages((prev) => [...prev, msg]);
-    socket?.emit('chat:message', {
+    socket.emit('chat:message', {
       consultationId: id,
-      recipientId: consultation?.doctorId || consultation?.doctor?._id,
+      recipientId,
       message: text,
     });
   };

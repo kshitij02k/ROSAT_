@@ -90,7 +90,7 @@ const checkDoctorInaction = (io, consultationId, doctorId, patientId) => {
     try {
       const consultation = await Consultation.findById(consultationId);
       if (consultation && consultation.status === 'waiting') {
-        // Auto-reassign the patient to another available doctor
+        // Auto-reassign after 3 minutes of doctor inaction to another available doctor
         const currentDoctor = await Doctor.findOne({ userId: doctorId });
         const spec = currentDoctor ? currentDoctor.specialization : 'General Physician';
 

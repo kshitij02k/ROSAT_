@@ -118,6 +118,7 @@ ol, ul { list-style: none; }
 .h-5 { height: 1.25rem; }
 .h-6 { height: 1.5rem; }
 .h-8 { height: 2rem; }
+.h-full { height: 100%; }
 .h-10 { height: 2.5rem; }
 .h-16 { height: 4rem; }
 .h-64 { height: 16rem; }
@@ -389,6 +390,7 @@ ol, ul { list-style: none; }
 .focus\:border-primary:focus { border-color: var(--color-primary); }
 .focus\:ring-2:focus { box-shadow: 0 0 0 2px var(--tw-ring-color, rgba(37, 99, 235, 0.5)); }
 .focus\:ring-primary:focus { --tw-ring-color: rgba(37, 99, 235, 0.5); }
+.focus\:ring-red-500:focus { --tw-ring-color: rgba(239, 68, 68, 0.5); }
 
 /* ===================================================================
    DISABLED VARIANTS

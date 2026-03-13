@@ -7,6 +7,8 @@ const { calculatePriorityScore, reorderQueue, handleEmergencySpillover, checkDoc
 const { triageSymptoms } = require('../services/groqService');
 const { getIo } = require('../server');
 
+const URGENT_MIN_EMERGENCY_LEVEL = 4;
+
 const findBestDoctor = async (specialization, excludeId) => {
   const query = { isOnline: true, specialization };
   if (excludeId) query.userId = { $ne: excludeId };
@@ -338,7 +340,7 @@ const urgentRequest = async (req, res) => {
 
     // Instant AI triage
     const triage = await triageSymptoms(symptoms, resolvedAge, resolvedGender, 'Urgent');
-    const emergencyLevel = Math.max(triage.emergencyLevel, 4); // Urgent = at least level 4
+    const emergencyLevel = Math.max(triage.emergencyLevel, URGENT_MIN_EMERGENCY_LEVEL); // Urgent = at least level 4
     const predictedCategory = triage.doctorSpecialization;
     const isCritical = triage.isCriticalOperationToday;
 

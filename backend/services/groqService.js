@@ -4,6 +4,10 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama3-8b-8192';
 
+if (!GROQ_API_KEY) {
+  console.warn('[groqService] WARNING: GROQ_API_KEY is not set. AI triage will use rule-based fallback.');
+}
+
 /**
  * Analyze patient symptoms using Groq LLM to determine:
  * - emergencyLevel (1-5)
